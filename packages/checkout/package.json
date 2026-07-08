@@ -1,0 +1,65 @@
+{
+  "name": "@invoq/checkout",
+  "version": "0.1.0",
+  "description": "Browser SDK for opening invoq stablecoin checkout.",
+  "keywords": [
+    "invoq",
+    "stablecoin",
+    "stablecoin-payments",
+    "payments",
+    "crypto-payments",
+    "usdc",
+    "usdt",
+    "checkout",
+    "browser",
+    "iframe",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/invoqmoney/sdk-js.git",
+    "directory": "packages/checkout"
+  },
+  "bugs": {
+    "url": "https://github.com/invoqmoney/sdk-js/issues"
+  },
+  "homepage": "https://github.com/invoqmoney/sdk-js/tree/main/packages/checkout#readme",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "unpkg": "./dist/index.iife.js",
+  "jsdelivr": "./dist/index.iife.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "tsdown": {
+    "format": {
+      "esm": {},
+      "iife": {
+        "minify": true
+      }
+    },
+    "platform": "browser",
+    "target": "es2015",
+    "globalName": "Invoq"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prepack": "pnpm build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --environment happy-dom"
+  }
+}
