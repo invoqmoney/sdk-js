@@ -27,6 +27,21 @@
 - **ผู้ซื้อไม่ต้องสมัครอะไรทั้งนั้น** กระเป๋าเงินไหนก็จ่ายได้ — โอนตรงจากกระดานเทรดก็ได้เหมือนกัน หน้าชำระเงินรองรับสิบภาษา
 - **ราคาเข้าใจง่าย** 10 ยอดชำระแรกฟรี หลังจากนั้น 0.5% ไม่มีค่าใช้จ่ายอื่นใดอีก — ดูราคาปัจจุบันได้ที่ [invoq.money](https://invoq.money)
 
+## SDK ฝั่งเซิร์ฟเวอร์
+
+สร้างใบแจ้งหนี้และตรวจสอบ webhook จากแบ็กเอนด์ของคุณด้วยภาษาใดก็ได้เหล่านี้ — REST API และลายเซ็น webhook เหมือนกันทุกภาษา repo นี้คือ SDK สำหรับ JavaScript
+
+| ภาษา | Repo |
+| --- | --- |
+| Node.js | **repo นี้** — `@invoq/server` |
+| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
+| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
+| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
+| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+
+จะเลือกแบ็กเอนด์ตัวไหนก็ตาม ฝั่งเบราว์เซอร์เหมือนกันหมด: **`@invoq/checkout`** (ใน repo นี้) เปิดหน้าชำระเงินแบบฝังในหน้าเว็บให้ฟรอนต์เอนด์ใดก็ได้
+
 ## ติดตั้ง
 
 ติดตั้งแพ็กเกจฝั่งเซิร์ฟเวอร์ในแบ็กเอนด์ของคุณ:
@@ -294,10 +309,10 @@ openCheckout(invoiceId, {
 
 - X: [@invoqmoney](https://x.com/invoqmoney) · 中文: [@invoqcn](https://x.com/invoqcn)
 - แชท: [Discord](https://discord.gg/V8cVrg4dET)
-- ประกาศ: [ช่อง Telegram](https://t.me/invoqmoney)
+- ประกาศ: [ช่อง Telegram](https://telegram.me/invoqmoney)
 - อีเมล: help@invoq.money
 
-SDK ฝั่งเซิร์ฟเวอร์ของ invoq ยังมีเวอร์ชัน Go, PHP, Python, Ruby และ Rust ด้วย ถ้า invoq มีประโยชน์กับคุณ ดาวหนึ่งดวงบน repo นี้ช่วยให้คนอื่นเจอมันง่ายขึ้น
+ถ้า invoq มีประโยชน์กับคุณ ดาวหนึ่งดวงบน repo นี้ช่วยให้คนอื่นเจอมันง่ายขึ้น
 
 ## สัญญาอนุญาต
 

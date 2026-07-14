@@ -27,6 +27,21 @@ Mau lihat dulu? Beranda [invoq.money](https://invoq.money) menjalankan demo inte
 - **Pembeli tidak perlu mendaftar apa pun.** Dompet apa pun bisa bayar — langsung dari bursa juga bisa. Checkout ini tersedia dalam sepuluh bahasa.
 - **Harga sederhana.** 10 pembayaran pertama gratis, lalu 0,5%, tanpa biaya lain — lihat harga terbaru di [invoq.money](https://invoq.money).
 
+## SDK server
+
+Buat invoice dan verifikasi webhook dari backend Anda dalam bahasa mana pun berikut — REST API dan tanda tangan webhook-nya sama persis. Repo ini adalah SDK JavaScript.
+
+| Bahasa | Repositori |
+| --- | --- |
+| Node.js | **repo ini** — `@invoq/server` |
+| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
+| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
+| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
+| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+
+Backend mana pun yang Anda pilih, sisi browser-nya sama: **`@invoq/checkout`** (di repo ini) membuka jendela checkout yang tertanam di halaman untuk frontend apa pun.
+
 ## Instalasi
 
 Pasang paket server di backend Anda:
@@ -294,10 +309,10 @@ openCheckout(invoiceId, {
 
 - X: [@invoqmoney](https://x.com/invoqmoney) · 中文: [@invoqcn](https://x.com/invoqcn)
 - Obrolan: [Discord](https://discord.gg/V8cVrg4dET)
-- Pembaruan: [Kanal Telegram](https://t.me/invoqmoney)
+- Pembaruan: [Kanal Telegram](https://telegram.me/invoqmoney)
 - Email: help@invoq.money
 
-SDK server invoq juga tersedia untuk Go, PHP, Python, Ruby, dan Rust. Kalau invoq berguna buat Anda, bintang di repo ini membantu orang lain menemukannya.
+Kalau invoq berguna buat Anda, bintang di repo ini membantu orang lain menemukannya.
 
 ## Lisensi
 

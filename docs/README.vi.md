@@ -27,6 +27,21 @@ Muốn xem trước? Trang chủ [invoq.money](https://invoq.money) chạy sẵn
 - **Người mua không phải đăng ký gì.** Ví nào cũng trả được — trả thẳng từ sàn cũng xong. Trang thanh toán hỗ trợ mười ngôn ngữ.
 - **Giá đơn giản.** Miễn phí 10 khoản thanh toán đầu tiên, sau đó 0,5%, không còn phí nào khác — xem giá hiện hành tại [invoq.money](https://invoq.money).
 
+## SDK server
+
+Tạo hóa đơn và xác minh webhook từ backend của bạn bằng bất kỳ ngôn ngữ nào dưới đây — cùng REST API, cùng chữ ký webhook. Repo này là SDK JavaScript.
+
+| Ngôn ngữ | Repo |
+| --- | --- |
+| Node.js | **repo này** — `@invoq/server` |
+| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
+| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
+| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
+| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+
+Dù bạn chọn backend nào, phía trình duyệt vẫn như nhau: **`@invoq/checkout`** (trong repo này) mở cửa sổ thanh toán nhúng trong trang cho mọi frontend.
+
 ## Cài đặt
 
 Cài gói server ở backend:
@@ -294,10 +309,10 @@ openCheckout(invoiceId, {
 
 - X: [@invoqmoney](https://x.com/invoqmoney) · 中文: [@invoqcn](https://x.com/invoqcn)
 - Trò chuyện: [Discord](https://discord.gg/V8cVrg4dET)
-- Cập nhật: [Kênh Telegram](https://t.me/invoqmoney)
+- Cập nhật: [Kênh Telegram](https://telegram.me/invoqmoney)
 - Email: help@invoq.money
 
-SDK server của invoq còn có bản Go, PHP, Python, Ruby và Rust. Nếu invoq hữu ích với bạn, một ngôi sao cho repo này sẽ giúp nhiều người tìm thấy nó hơn.
+Nếu invoq hữu ích với bạn, một ngôi sao cho repo này sẽ giúp nhiều người tìm thấy nó hơn.
 
 ## Giấy phép
 

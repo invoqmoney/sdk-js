@@ -25,6 +25,21 @@ Want to see it first? The [invoq.money](https://invoq.money) homepage runs an in
 - **Nothing for buyers to sign up for.** Any wallet can pay — straight from an exchange works too. The checkout supports ten languages.
 - **Simple pricing.** First 10 payments free, then 0.5%, no other fees — see [invoq.money](https://invoq.money) for current pricing.
 
+## Server SDKs
+
+Create invoices and verify webhooks from your backend in any of these languages — same REST API, same webhook signature. This repo is the JavaScript SDK.
+
+| Language | Repository |
+| --- | --- |
+| Node.js | **this repo** — `@invoq/server` |
+| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
+| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
+| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
+| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+
+Whichever backend you pick, the browser side is the same: **`@invoq/checkout`** (in this repo) opens the in-page checkout modal for any frontend.
+
 ## Install
 
 Install the server package in your backend:
@@ -292,10 +307,10 @@ openCheckout(invoiceId, {
 
 - X: [@invoqmoney](https://x.com/invoqmoney) · 中文: [@invoqcn](https://x.com/invoqcn)
 - Chat: [Discord](https://discord.gg/V8cVrg4dET)
-- Updates: [Telegram Channel](https://t.me/invoqmoney)
+- Updates: [Telegram Channel](https://telegram.me/invoqmoney)
 - Email: help@invoq.money
 
-invoq server SDKs are also available for Go, PHP, Python, Ruby, and Rust. If invoq is useful to you, a star on this repo helps others find it.
+If invoq is useful to you, a star on this repo helps others find it.
 
 ## License
 

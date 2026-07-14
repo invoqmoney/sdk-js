@@ -27,6 +27,21 @@
 - **買家什麼都不用註冊。** 任何錢包都能付，從交易所直接提幣也行。結帳頁支援十種語言。
 - **定價簡單。** 前 10 筆收款免手續費，之後 0.5%，無其他費用——目前定價請見 [invoq.money](https://invoq.money)。
 
+## 伺服器端 SDK
+
+用下面任一種語言，都能從你的後端建立帳單、驗證 webhook——REST API 和 webhook 簽章完全一致。本倉庫是 JavaScript SDK。
+
+| 語言 | 倉庫 |
+| --- | --- |
+| Node.js | **本倉庫**（`@invoq/server`） |
+| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
+| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
+| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
+| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+
+無論後端選哪種語言，瀏覽器這一側都一樣：**`@invoq/checkout`**（在本倉庫）為任意前端打開嵌在頁面裡的結帳彈窗。
+
 ## 安裝
 
 在後端安裝 server 套件：
@@ -294,10 +309,10 @@ openCheckout(invoiceId, {
 
 - X：中文 [@invoqcn](https://x.com/invoqcn) · English [@invoqmoney](https://x.com/invoqmoney)
 - 聊天：[Discord](https://discord.gg/V8cVrg4dET)
-- 公告：[Telegram 頻道](https://t.me/invoqmoney)
+- 公告：[Telegram 頻道](https://telegram.me/invoqmoney)
 - 電子郵件：help@invoq.money
 
-invoq 的伺服器端 SDK 還有 Go、PHP、Python、Ruby、Rust 版本。如果 invoq 對你有幫助，給這個倉庫一顆星星，能讓更多人找到它。
+如果 invoq 對你有幫助，給這個倉庫一顆星星，能讓更多人找到它。
 
 ## 授權條款
 

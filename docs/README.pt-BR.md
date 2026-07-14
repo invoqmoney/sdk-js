@@ -27,6 +27,21 @@ Quer ver primeiro? A página inicial de [invoq.money](https://invoq.money) roda 
 - **O comprador não se cadastra em nada.** Qualquer carteira paga — direto de uma exchange também funciona. O checkout está disponível em dez idiomas.
 - **Preço simples.** Os 10 primeiros pagamentos sem taxa, depois 0,5%, nenhuma outra taxa — veja os preços vigentes em [invoq.money](https://invoq.money).
 
+## SDKs de servidor
+
+Crie faturas e verifique webhooks a partir do seu backend em qualquer uma destas linguagens — mesma REST API, mesma assinatura de webhook. Este repositório é o SDK de JavaScript.
+
+| Linguagem | Repositório |
+| --- | --- |
+| Node.js | **este repositório** — `@invoq/server` |
+| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
+| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
+| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
+| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+
+Qualquer que seja o backend escolhido, o lado do navegador é o mesmo: **`@invoq/checkout`** (neste repositório) abre a janela de checkout dentro da página para qualquer frontend.
+
 ## Instalação
 
 Instale o pacote de servidor no seu backend:
@@ -294,10 +309,10 @@ openCheckout(invoiceId, {
 
 - X: [@invoqmoney](https://x.com/invoqmoney) · 中文: [@invoqcn](https://x.com/invoqcn)
 - Chat: [Discord](https://discord.gg/V8cVrg4dET)
-- Atualizações: [Canal do Telegram](https://t.me/invoqmoney)
+- Atualizações: [Canal do Telegram](https://telegram.me/invoqmoney)
 - E-mail: help@invoq.money
 
-Os SDKs de servidor da invoq também existem para Go, PHP, Python, Ruby e Rust. Se a invoq for útil para você, uma estrela neste repositório ajuda outras pessoas a encontrá-lo.
+Se a invoq for útil para você, uma estrela neste repositório ajuda outras pessoas a encontrá-lo.
 
 ## Licença
 
