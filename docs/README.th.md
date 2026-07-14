@@ -31,14 +31,14 @@
 
 สร้างใบแจ้งหนี้และตรวจสอบ webhook จากแบ็กเอนด์ของคุณด้วยภาษาใดก็ได้เหล่านี้ — REST API และลายเซ็น webhook เหมือนกันทุกภาษา repo นี้คือ SDK สำหรับ JavaScript
 
-| ภาษา | Repo |
-| --- | --- |
-| Node.js | **repo นี้** — `@invoq/server` |
-| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
-| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
-| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
-| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
-| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+| ภาษา    | Repo                                                                         |
+| ------- | ---------------------------------------------------------------------------- |
+| Node.js | **repo นี้** — `@invoq/server`                                               |
+| Python  | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP     | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php)       |
+| Go      | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go)         |
+| Rust    | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust)     |
+| Ruby    | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby)     |
 
 จะเลือกแบ็กเอนด์ตัวไหนก็ตาม ฝั่งเบราว์เซอร์เหมือนกันหมด: **`@invoq/checkout`** (ใน repo นี้) เปิดหน้าชำระเงินแบบฝังในหน้าเว็บให้ฟรอนต์เอนด์ใดก็ได้
 

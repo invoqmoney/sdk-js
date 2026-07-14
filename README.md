@@ -29,14 +29,14 @@ Want to see it first? The [invoq.money](https://invoq.money) homepage runs an in
 
 Create invoices and verify webhooks from your backend in any of these languages — same REST API, same webhook signature. This repo is the JavaScript SDK.
 
-| Language | Repository |
-| --- | --- |
-| Node.js | **this repo** — `@invoq/server` |
-| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
-| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
-| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
-| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
-| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+| Language | Repository                                                                   |
+| -------- | ---------------------------------------------------------------------------- |
+| Node.js  | **this repo** — `@invoq/server`                                              |
+| Python   | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP      | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php)       |
+| Go       | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go)         |
+| Rust     | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust)     |
+| Ruby     | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby)     |
 
 Whichever backend you pick, the browser side is the same: **`@invoq/checkout`** (in this repo) opens the in-page checkout modal for any frontend.
 

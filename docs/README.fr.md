@@ -31,14 +31,14 @@ Envie de le voir d’abord ? La page d’accueil d’[invoq.money](https://inv
 
 Créez des factures et vérifiez les webhooks depuis votre backend dans l’un de ces langages — même REST API, même signature de webhook. Ce dépôt est le SDK JavaScript.
 
-| Langage | Dépôt |
-| --- | --- |
-| Node.js | **ce dépôt** — `@invoq/server` |
-| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
-| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
-| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
-| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
-| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+| Langage | Dépôt                                                                        |
+| ------- | ---------------------------------------------------------------------------- |
+| Node.js | **ce dépôt** — `@invoq/server`                                               |
+| Python  | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP     | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php)       |
+| Go      | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go)         |
+| Rust    | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust)     |
+| Ruby    | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby)     |
 
 Quel que soit le backend choisi, le côté navigateur reste le même : **`@invoq/checkout`** (dans ce dépôt) ouvre la fenêtre de paiement intégrée à la page pour n’importe quel frontend.
 

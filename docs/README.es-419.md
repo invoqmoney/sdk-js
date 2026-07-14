@@ -31,14 +31,14 @@ Acepta pagos en stablecoins en tu sitio web con una ventana de pago integrada en
 
 Crea facturas y verifica webhooks desde tu backend en cualquiera de estos lenguajes — la misma REST API y la misma firma de webhook. Este repositorio es el SDK de JavaScript.
 
-| Lenguaje | Repositorio |
-| --- | --- |
-| Node.js | **este repositorio** — `@invoq/server` |
-| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
-| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
-| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
-| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
-| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+| Lenguaje | Repositorio                                                                  |
+| -------- | ---------------------------------------------------------------------------- |
+| Node.js  | **este repositorio** — `@invoq/server`                                       |
+| Python   | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP      | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php)       |
+| Go       | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go)         |
+| Rust     | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust)     |
+| Ruby     | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby)     |
 
 Elijas el backend que elijas, el lado del navegador es el mismo: **`@invoq/checkout`** (en este repositorio) abre la ventana de pago integrada en la página para cualquier frontend.
 

@@ -31,14 +31,14 @@ Mau lihat dulu? Beranda [invoq.money](https://invoq.money) menjalankan demo inte
 
 Buat invoice dan verifikasi webhook dari backend Anda dalam bahasa mana pun berikut — REST API dan tanda tangan webhook-nya sama persis. Repo ini adalah SDK JavaScript.
 
-| Bahasa | Repositori |
-| --- | --- |
-| Node.js | **repo ini** — `@invoq/server` |
-| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
-| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
-| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
-| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
-| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+| Bahasa  | Repositori                                                                   |
+| ------- | ---------------------------------------------------------------------------- |
+| Node.js | **repo ini** — `@invoq/server`                                               |
+| Python  | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP     | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php)       |
+| Go      | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go)         |
+| Rust    | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust)     |
+| Ruby    | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby)     |
 
 Backend mana pun yang Anda pilih, sisi browser-nya sama: **`@invoq/checkout`** (di repo ini) membuka jendela checkout yang tertanam di halaman untuk frontend apa pun.
 

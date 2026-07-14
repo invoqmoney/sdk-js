@@ -31,14 +31,14 @@
 
 用下面任一種語言，都能從你的後端建立帳單、驗證 webhook——REST API 和 webhook 簽章完全一致。本倉庫是 JavaScript SDK。
 
-| 語言 | 倉庫 |
-| --- | --- |
-| Node.js | **本倉庫**（`@invoq/server`） |
-| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
-| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
-| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
-| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
-| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+| 語言    | 倉庫                                                                         |
+| ------- | ---------------------------------------------------------------------------- |
+| Node.js | **本倉庫**（`@invoq/server`）                                                |
+| Python  | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP     | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php)       |
+| Go      | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go)         |
+| Rust    | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust)     |
+| Ruby    | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby)     |
 
 無論後端選哪種語言，瀏覽器這一側都一樣：**`@invoq/checkout`**（在本倉庫）為任意前端打開嵌在頁面裡的結帳彈窗。
 

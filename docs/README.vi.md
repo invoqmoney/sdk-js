@@ -31,14 +31,14 @@ Muốn xem trước? Trang chủ [invoq.money](https://invoq.money) chạy sẵn
 
 Tạo hóa đơn và xác minh webhook từ backend của bạn bằng bất kỳ ngôn ngữ nào dưới đây — cùng REST API, cùng chữ ký webhook. Repo này là SDK JavaScript.
 
-| Ngôn ngữ | Repo |
-| --- | --- |
-| Node.js | **repo này** — `@invoq/server` |
-| Python | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
-| PHP | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php) |
-| Go | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go) |
-| Rust | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust) |
-| Ruby | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby) |
+| Ngôn ngữ | Repo                                                                         |
+| -------- | ---------------------------------------------------------------------------- |
+| Node.js  | **repo này** — `@invoq/server`                                               |
+| Python   | [github.com/invoqmoney/sdk-python](https://github.com/invoqmoney/sdk-python) |
+| PHP      | [github.com/invoqmoney/sdk-php](https://github.com/invoqmoney/sdk-php)       |
+| Go       | [github.com/invoqmoney/sdk-go](https://github.com/invoqmoney/sdk-go)         |
+| Rust     | [github.com/invoqmoney/sdk-rust](https://github.com/invoqmoney/sdk-rust)     |
+| Ruby     | [github.com/invoqmoney/sdk-ruby](https://github.com/invoqmoney/sdk-ruby)     |
 
 Dù bạn chọn backend nào, phía trình duyệt vẫn như nhau: **`@invoq/checkout`** (trong repo này) mở cửa sổ thanh toán nhúng trong trang cho mọi frontend.
 
