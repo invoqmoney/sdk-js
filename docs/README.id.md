@@ -236,10 +236,10 @@ const invoq = new Invoq(apiKey, {
 - `invoq.invoices.get(invoiceId)` — mengambil invoice publik.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — menyimulasikan pembayaran pada invoice uji coba.
 
-`invoices.get()` mengembalikan bentuk invoice publik yang dipakai halaman checkout ter-hosting. Ini mencakup field untuk checkout seperti `amount_paid`, `amount_due`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, dan `direct_onchain_rails`, tetapi tidak menyertakan `reference_id`. Gunakan respons pembuatan atau webhook `invoice.paid` saat Anda membutuhkan `reference_id` merchant.
+`invoices.get()` mengembalikan bentuk invoice publik yang dipakai halaman checkout ter-hosting. Ini mencakup field untuk checkout seperti `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers`, dan `direct_onchain_rails`, tetapi tidak menyertakan `reference_id`. Gunakan respons pembuatan atau webhook `invoice.paid` saat Anda membutuhkan `reference_id` merchant.
 
 Jumlah di respons dinormalkan ke 4 angka desimal: buat dengan `'129'` dan invoice mengembalikan `amount: '129.0000'`. Bandingkan jumlah secara numerik, bukan sebagai string.
-`amount_due` diturunkan sebagai `max(amount - amount_paid, 0)` dan memakai skala 18 desimal yang sama dengan `amount_paid`.
+`amount_due` diturunkan sebagai `max(amount - amount_paid, 0)` dan memakai skala 18 desimal yang sama dengan `amount_paid`; `amount_overpaid` adalah kebalikannya, `max(amount_paid - amount, 0)`, jadi Anda tidak perlu mengurangkannya sendiri. `monitoring_status` bernilai `'active'` atau `'ended'` — begitu bernilai `'ended'`, alamat deposit tidak lagi dipantau — dan `transfers` adalah jejak penerimaan on-chain yang sudah terkonfirmasi (tiap entri punya `tx_hash`, `amount`, dan `explorer_tx_url`). Keduanya bernilai `null` / `[]` untuk invoice uji coba.
 
 Jika gagal, semua metode mengembalikan `Promise` yang di-reject dengan:
 
@@ -266,10 +266,12 @@ const result = await checkout.result
 
 `result` selalu resolve dan tidak pernah reject, dengan salah satu nilai berikut:
 
-- `{ status: 'paid' | 'overpaid', invoiceId }` — pembayaran terkonfirmasi. Modal tetap terbuka menampilkan layar sukses embed sampai pembeli menutupnya; panggil `checkout.close()` dulu kalau Anda langsung berpindah halaman.
-- `{ status: 'review_required', invoiceId }` — pembayaran diterima, tetapi perlu peninjauan manual. Tampilkan status menunggu peninjauan; jangan proses pesanan dari hasil browser.
+- `{ status: 'paid' | 'overpaid', invoiceId, mode }` — pembayaran terkonfirmasi. Modal tetap terbuka menampilkan layar sukses embed sampai pembeli menutupnya; panggil `checkout.close()` dulu kalau Anda langsung berpindah halaman.
+- `{ status: 'review_required', invoiceId, mode }` — pembayaran diterima, tetapi perlu peninjauan manual. Tampilkan status menunggu peninjauan; jangan proses pesanan dari hasil browser.
 - `{ status: 'closed', invoiceId, reason }` — ditutup tanpa pembayaran. `reason` bisa `'user'` (tombol tutup atau Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (panggilan `openCheckout` lain), atau `'aborted'` (`signal` terpicu).
 - `{ status: 'failed', invoiceId }` — checkout tidak termuat dalam 15 detik.
+
+Pada hasil pembayaran, `mode` bernilai `'test'` atau `'live'` — petunjuk agar Anda bisa membedakan pembayaran uji coba yang disimulasikan dari uang sungguhan di browser. Ini hanya bersifat indikatif: selalu pastikan pesanan diproses di server Anda lewat webhook `invoice.paid`.
 
 `openCheckout` sendiri melempar error pada input tidak valid (`invoiceId` harus diawali `inv_`) dan di browser tanpa dukungan Shadow DOM. Hanya satu checkout yang terbuka pada satu waktu; membuka yang lain menutup yang sebelumnya dengan `reason: 'replaced'`.
 

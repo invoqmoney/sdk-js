@@ -12,7 +12,9 @@ const invoice = {
   deposit_address: null,
   status: 'unpaid',
   amount_due: '149.000000000000000000',
+  amount_overpaid: '0.000000000000000000',
   monitoring_ends_at: null,
+  monitoring_status: null,
   direct_onchain_rails: [],
 }
 
@@ -31,10 +33,13 @@ const publicInvoice = {
   deposit_address: null,
   status: 'unpaid',
   amount_due: '149.000000000000000000',
+  amount_overpaid: '0.000000000000000000',
   monitoring_ends_at: null,
+  monitoring_status: null,
   direct_onchain_rails: [],
   amount_paid: '0',
   payment_status: 'unpaid',
+  transfers: [],
 }
 
 describe('@invoq/server client', () => {

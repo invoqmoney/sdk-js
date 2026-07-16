@@ -236,10 +236,10 @@ const invoq = new Invoq(apiKey, {
 - `invoq.invoices.get(invoiceId)` — herkese açık faturayı getirir.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — test faturasında ödeme simüle eder.
 
-`invoices.get()` barındırılan checkout sayfasının kullandığı herkese açık fatura şeklini döndürür. `amount_paid`, `amount_due`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at` ve `direct_onchain_rails` gibi checkout'a yönelik alanları içerir, ancak `reference_id` içermez. Merchant `reference_id` değeriniz gerektiğinde oluşturma yanıtını veya `invoice.paid` webhook'unu kullanın.
+`invoices.get()` barındırılan checkout sayfasının kullandığı herkese açık fatura şeklini döndürür. `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers` ve `direct_onchain_rails` gibi checkout'a yönelik alanları içerir, ancak `reference_id` içermez. Merchant `reference_id` değeriniz gerektiğinde oluşturma yanıtını veya `invoice.paid` webhook'unu kullanın.
 
 Yanıtlardaki tutarlar 4 ondalık basamağa normalize edilir: `'129'` ile oluşturun, fatura `amount: '129.0000'` döndürür. Tutarları dize olarak değil, sayısal karşılaştırın.
-`amount_due`, `max(amount - amount_paid, 0)` olarak türetilir ve `amount_paid` ile aynı 18 ondalık basamak ölçeğini kullanır.
+`amount_due`, `max(amount - amount_paid, 0)` olarak türetilir ve `amount_paid` ile aynı 18 ondalık basamak ölçeğini kullanır; `amount_overpaid` ise onun aynasıdır, `max(amount_paid - amount, 0)`, yani parayı kendiniz çıkarmanız hiç gerekmez. `monitoring_status`, `'active'` ya da `'ended'` olur — `'ended'` olduğunda yatırma adresi artık izlenmez — ve `transfers`, onaylanmış zincir üstü tahsilat kaydıdır (her girdide `tx_hash`, `amount` ve `explorer_tx_url` bulunur). İkisi de test faturaları için `null` / `[]` olur.
 
 Hata durumunda tüm metotlar, şu hatalarla reject olan bir `Promise` döndürür:
 
@@ -266,10 +266,12 @@ const result = await checkout.result
 
 `result` her zaman resolve olur ve asla reject etmez; şunlardan birini döndürür:
 
-- `{ status: 'paid' | 'overpaid', invoiceId }` — ödeme onaylandı. Pencere, müşteri kapatana kadar embed'in başarı ekranında açık kalır; hemen başka sayfaya geçecekseniz önce `checkout.close()` çağırın.
-- `{ status: 'review_required', invoiceId }` — ödeme alındı, ancak manuel inceleme gerekiyor. İnceleme bekleyen durumu gösterin; tarayıcı sonucuna dayanarak siparişi işlemeyin.
+- `{ status: 'paid' | 'overpaid', invoiceId, mode }` — ödeme onaylandı. Pencere, müşteri kapatana kadar embed'in başarı ekranında açık kalır; hemen başka sayfaya geçecekseniz önce `checkout.close()` çağırın.
+- `{ status: 'review_required', invoiceId, mode }` — ödeme alındı, ancak manuel inceleme gerekiyor. İnceleme bekleyen durumu gösterin; tarayıcı sonucuna dayanarak siparişi işlemeyin.
 - `{ status: 'closed', invoiceId, reason }` — ödeme olmadan kapandı. `reason` şunlardan biri: `'user'` (kapat düğmesi veya Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (başka bir `openCheckout` çağrısı), `'aborted'` (`signal` tetiklendi).
 - `{ status: 'failed', invoiceId }` — ödeme sayfası 15 saniye içinde yüklenmedi.
+
+Ödeme sonuçlarında `mode`, `'test'` veya `'live'` olur — tarayıcıda simüle edilmiş bir test ödemesini gerçek paradan ayırt edebilmeniz için bir ipucu. Yalnızca bilgilendirme amaçlıdır: siparişin işlendiğini her zaman sunucunuzda `invoice.paid` webhook'uyla doğrulayın.
 
 `openCheckout`'un kendisi geçersiz girdide (`invoiceId` `inv_` ile başlamalı) ve Shadow DOM desteklemeyen tarayıcılarda hata fırlatır. Aynı anda yalnızca bir ödeme penceresi açık olur; bir yenisini açmak öncekini `reason: 'replaced'` ile kapatır.
 

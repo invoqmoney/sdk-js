@@ -194,11 +194,13 @@ describe('@invoq/checkout controller', () => {
       type: 'invoq:state',
       channel,
       state: 'paid',
+      mode: 'live',
     })
 
     await expect(checkout.result).resolves.toEqual({
       status: 'paid',
       invoiceId: 'inv_test_123',
+      mode: 'live',
     })
   })
 
@@ -298,6 +300,7 @@ describe('@invoq/checkout controller', () => {
       type: 'invoq:state',
       channel,
       state: 'paid',
+      mode: 'live',
     })
 
     expect(spinner.hidden).toBe(true)
@@ -309,6 +312,7 @@ describe('@invoq/checkout controller', () => {
     await expect(checkout.result).resolves.toEqual({
       status: 'paid',
       invoiceId: 'inv_test_123',
+      mode: 'live',
     })
 
     checkout.close()
@@ -322,11 +326,13 @@ describe('@invoq/checkout controller', () => {
       type: 'invoq:state',
       channel: firstMounted.channel,
       state: 'paid',
+      mode: 'live',
     })
     postMessageFromIframe(firstMounted.iframe, 'https://embed.test', {
       type: 'invoq:state',
       channel: firstMounted.channel,
       state: 'overpaid',
+      mode: 'live',
     })
     postMessageFromIframe(firstMounted.iframe, 'https://embed.test', {
       type: 'invoq:close',
@@ -336,6 +342,7 @@ describe('@invoq/checkout controller', () => {
     await expect(first.result).resolves.toEqual({
       status: 'paid',
       invoiceId: 'inv_test_123',
+      mode: 'live',
     })
 
     const second = openTestCheckout()
@@ -345,11 +352,13 @@ describe('@invoq/checkout controller', () => {
       type: 'invoq:state',
       channel: secondMounted.channel,
       state: 'overpaid',
+      mode: 'test',
     })
 
     await expect(second.result).resolves.toEqual({
       status: 'overpaid',
       invoiceId: 'inv_test_123',
+      mode: 'test',
     })
   })
 
@@ -361,11 +370,13 @@ describe('@invoq/checkout controller', () => {
       type: 'invoq:state',
       channel,
       state: 'review_required',
+      mode: 'live',
     })
 
     await expect(checkout.result).resolves.toEqual({
       status: 'review_required',
       invoiceId: 'inv_test_123',
+      mode: 'live',
     })
   })
 
@@ -402,6 +413,41 @@ describe('@invoq/checkout controller', () => {
       status: 'closed',
       invoiceId: 'inv_test_123',
       reason: 'programmatic',
+    })
+  })
+
+  it('carries the payment mode and defaults a missing mode to live', async () => {
+    const withMode = openTestCheckout()
+    const withModeMounted = getMountedCheckout()
+
+    postMessageFromIframe(withModeMounted.iframe, 'https://embed.test', {
+      type: 'invoq:state',
+      channel: withModeMounted.channel,
+      state: 'paid',
+      mode: 'test',
+    })
+
+    await expect(withMode.result).resolves.toEqual({
+      status: 'paid',
+      invoiceId: 'inv_test_123',
+      mode: 'test',
+    })
+
+    // An older embed that predates the mode field must not mute the result; it
+    // degrades to 'live' — the safe direction, never labeling real money 'test'.
+    const withoutMode = openTestCheckout()
+    const withoutModeMounted = getMountedCheckout()
+
+    postMessageFromIframe(withoutModeMounted.iframe, 'https://embed.test', {
+      type: 'invoq:state',
+      channel: withoutModeMounted.channel,
+      state: 'paid',
+    })
+
+    await expect(withoutMode.result).resolves.toEqual({
+      status: 'paid',
+      invoiceId: 'inv_test_123',
+      mode: 'live',
     })
   })
 

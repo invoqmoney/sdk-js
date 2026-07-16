@@ -1,3 +1,10 @@
+import type { CheckoutMode } from '../types'
+
+export type EmbedMessage =
+  | { type: 'invoq:ready' }
+  | { type: 'invoq:close' }
+  | { type: 'invoq:state'; state: string; mode: CheckoutMode }
+
 export function parseEmbedMessage(
   event: MessageEvent,
   options: {
@@ -5,7 +12,7 @@ export function parseEmbedMessage(
     checkoutOrigin: string
     channel: string
   },
-) {
+): EmbedMessage | null {
   if (event.source !== options.iframe.contentWindow) {
     return null
   }
@@ -43,6 +50,10 @@ export function parseEmbedMessage(
       return {
         type: 'invoq:state',
         state: typeof message.state === 'string' ? message.state : '',
+        // `mode` rides every state event so a host can tell a simulated test
+        // payment from real money. Anything that isn't 'test' degrades to
+        // 'live' — the safe direction: never label real money as a test.
+        mode: message.mode === 'test' ? 'test' : 'live',
       }
     default:
       return null

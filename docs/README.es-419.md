@@ -236,10 +236,10 @@ const invoq = new Invoq(apiKey, {
 - `invoq.invoices.get(invoiceId)` — trae una factura pública.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — simula un pago en una factura de prueba.
 
-`invoices.get()` devuelve la forma de factura pública usada por la página de checkout hospedada. Incluye campos orientados al checkout como `amount_paid`, `amount_due`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at` y `direct_onchain_rails`, pero no incluye `reference_id`. Usa la respuesta de creación o el webhook `invoice.paid` cuando necesites tu `reference_id` de comercio.
+`invoices.get()` devuelve la forma de factura pública usada por la página de checkout hospedada. Incluye campos orientados al checkout como `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers` y `direct_onchain_rails`, pero no incluye `reference_id`. Usa la respuesta de creación o el webhook `invoice.paid` cuando necesites tu `reference_id` de comercio.
 
 Los montos en las respuestas se normalizan a 4 decimales: crea con `'129'` y la factura devuelve `amount: '129.0000'`. Compara montos numéricamente, no como cadenas.
-`amount_due` se deriva como `max(amount - amount_paid, 0)` y usa la misma escala de 18 decimales que `amount_paid`.
+`amount_due` se deriva como `max(amount - amount_paid, 0)` y usa la misma escala de 18 decimales que `amount_paid`; `amount_overpaid` es su reflejo, `max(amount_paid - amount, 0)`, así que nunca restas dinero por tu cuenta. `monitoring_status` es `'active'` o `'ended'` — una vez que es `'ended'`, la dirección de depósito deja de vigilarse — y `transfers` es el registro confirmado de recepciones on-chain (cada entrada tiene `tx_hash`, `amount` y `explorer_tx_url`). Ambos son `null` / `[]` en las facturas de prueba.
 
 Cuando fallan, los métodos devuelven una promesa rechazada con:
 
@@ -266,10 +266,12 @@ const result = await checkout.result
 
 La promesa de `result` siempre se resuelve y nunca se rechaza, con uno de estos valores:
 
-- `{ status: 'paid' | 'overpaid', invoiceId }` — pago confirmado. La ventana queda abierta mostrando la pantalla de éxito del embed hasta que el comprador la cierre; llama primero a `checkout.close()` si vas a navegar de inmediato.
-- `{ status: 'review_required', invoiceId }` — pago recibido, pero requiere revisión manual. Muestra un estado pendiente de revisión; no proceses el pedido desde el resultado del navegador.
+- `{ status: 'paid' | 'overpaid', invoiceId, mode }` — pago confirmado. La ventana queda abierta mostrando la pantalla de éxito del embed hasta que el comprador la cierre; llama primero a `checkout.close()` si vas a navegar de inmediato.
+- `{ status: 'review_required', invoiceId, mode }` — pago recibido, pero requiere revisión manual. Muestra un estado pendiente de revisión; no proceses el pedido desde el resultado del navegador.
 - `{ status: 'closed', invoiceId, reason }` — se cerró sin pago. `reason` es `'user'` (botón de cerrar o Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (otra llamada a `openCheckout`) o `'aborted'` (se disparó el `signal`).
 - `{ status: 'failed', invoiceId }` — el checkout no cargó en 15 segundos.
+
+En los resultados de pago, `mode` es `'test'` o `'live'` — una pista para que distingas en el navegador un pago de prueba simulado de dinero real. Es solo orientativo: confirma siempre el procesamiento del pedido en tu servidor con el webhook `invoice.paid`.
 
 `openCheckout` en sí lanza error con entradas inválidas (`invoiceId` debe empezar con `inv_`) y en navegadores sin soporte de Shadow DOM. Solo hay un checkout abierto a la vez; abrir otro cierra el anterior con `reason: 'replaced'`.
 

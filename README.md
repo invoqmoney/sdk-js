@@ -234,10 +234,10 @@ const invoq = new Invoq(apiKey, {
 - `invoq.invoices.get(invoiceId)` — fetches a public invoice.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — simulates payment on a test invoice.
 
-`invoices.get()` returns the public invoice shape from the hosted checkout endpoint. It includes checkout-facing fields such as `amount_paid`, `amount_due`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, and `direct_onchain_rails`, but does not include `reference_id`. Use the create response or the `invoice.paid` webhook when you need your merchant `reference_id`.
+`invoices.get()` returns the public invoice shape from the hosted checkout endpoint. It includes checkout-facing fields such as `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers`, and `direct_onchain_rails`, but does not include `reference_id`. Use the create response or the `invoice.paid` webhook when you need your merchant `reference_id`.
 
 Amounts in responses are normalized to 4 decimal places: create with `'129'` and the invoice returns `amount: '129.0000'`. Compare amounts numerically, not as strings.
-`amount_due` is derived as `max(amount - amount_paid, 0)` and uses the same 18-decimal scale as `amount_paid`.
+`amount_due` is derived as `max(amount - amount_paid, 0)` and uses the same 18-decimal scale as `amount_paid`; `amount_overpaid` is its mirror, `max(amount_paid - amount, 0)`, so you never subtract money yourself. `monitoring_status` is `'active'` or `'ended'` — once it is `'ended'`, the deposit address is no longer watched — and `transfers` is the confirmed on-chain receipt trail (each entry has `tx_hash`, `amount`, and `explorer_tx_url`). Both are `null` / `[]` for test invoices.
 
 When they fail, all methods reject with:
 
@@ -264,10 +264,12 @@ const result = await checkout.result
 
 `result` always resolves (it never rejects) with one of:
 
-- `{ status: 'paid' | 'overpaid', invoiceId }` — payment confirmed. The modal stays open showing the embed's success screen until the customer dismisses it; call `checkout.close()` first if you navigate away immediately.
-- `{ status: 'review_required', invoiceId }` — payment was received but needs manual review. Show a pending-review state; do not fulfill from the browser result.
+- `{ status: 'paid' | 'overpaid', invoiceId, mode }` — payment confirmed. The modal stays open showing the embed's success screen until the customer dismisses it; call `checkout.close()` first if you navigate away immediately.
+- `{ status: 'review_required', invoiceId, mode }` — payment was received but needs manual review. Show a pending-review state; do not fulfill from the browser result.
 - `{ status: 'closed', invoiceId, reason }` — closed without payment. `reason` is `'user'` (close button or Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (another `openCheckout` call), or `'aborted'` (the `signal` fired).
 - `{ status: 'failed', invoiceId }` — the checkout did not load within 15 seconds.
+
+On the payment results, `mode` is `'test'` or `'live'` — a hint so you can distinguish a simulated test payment from real money in the browser. It is advisory only: always confirm fulfillment on your server with the `invoice.paid` webhook.
 
 `openCheckout` itself throws on invalid input (`invoiceId` must start with `inv_`) and in browsers without Shadow DOM support. Only one checkout is open at a time; opening another closes the previous one with `reason: 'replaced'`.
 

@@ -174,6 +174,7 @@ function handleMessage(checkout: ActiveCheckout, event: MessageEvent): void {
         settleResult(checkout, {
           status: message.state,
           invoiceId: checkout.invoiceId,
+          mode: message.mode,
         })
       }
       break
