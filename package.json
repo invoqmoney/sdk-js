@@ -1,6 +1,5 @@
 {
   "name": "sdk-js",
-  "version": "0.1.0",
   "description": "Workspace for the invoq JavaScript SDK packages.",
   "private": true,
   "license": "MIT",
