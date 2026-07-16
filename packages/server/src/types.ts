@@ -12,6 +12,10 @@ export type InvoiceStatus =
 export type InvoicePaymentStatus = InvoiceStatus | 'confirming'
 export type InvoicePaidStatus = 'paid' | 'settling' | 'settled'
 
+// Server-computed state of the invoice's deposit-address monitoring window.
+// 'ended' means the address is no longer watched. null for test invoices.
+export type MonitoringStatus = 'active' | 'ended'
+
 export type DirectOnchainRail = {
   chain_namespace: string
   chain_reference: string
@@ -35,7 +39,11 @@ export type Invoice = {
   deposit_address: string | null
   status: InvoiceStatus
   amount_due: string
+  // Excess received beyond the invoiced amount — max(amount_paid - amount, 0),
+  // same 18-decimal scale as amount_paid.
+  amount_overpaid: string
   monitoring_ends_at: string | null
+  monitoring_status: MonitoringStatus | null
   direct_onchain_rails: DirectOnchainRail[]
 }
 
@@ -50,10 +58,22 @@ export type PublicInvoiceProject = {
   logo_url: string | null
 }
 
+// One confirmed inbound transfer credited to the invoice — the payer-facing
+// receipt trail. `amount` is in invoice-currency units at the same scale as
+// amount_paid; `explorer_tx_url` is null when the chain has no usable explorer.
+export type PublicInvoiceTransfer = {
+  tx_hash: string
+  amount: string
+  explorer_tx_url: string | null
+}
+
 export type PublicInvoice = Omit<Invoice, 'reference_id'> & {
   amount_paid: string
   payment_status: InvoicePaymentStatus
   project: PublicInvoiceProject
+  // Confirmed on-chain receipts (see PublicInvoiceTransfer); [] for test
+  // invoices.
+  transfers: PublicInvoiceTransfer[]
 }
 
 export type CreateInvoiceInput = {

@@ -236,10 +236,10 @@ const invoq = new Invoq(apiKey, {
 - `invoq.invoices.get(invoiceId)` — ดึงข้อมูลใบแจ้งหนี้สาธารณะ
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — จำลองการจ่ายบนใบแจ้งหนี้ทดสอบ
 
-`invoices.get()` จะคืนรูปแบบใบแจ้งหนี้สาธารณะที่หน้า checkout แบบโฮสต์ใช้ โดยมีฟิลด์สำหรับ checkout เช่น `amount_paid`, `amount_due`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at` และ `direct_onchain_rails` แต่ไม่มี `reference_id` ถ้าต้องใช้ `reference_id` ฝั่ง merchant ให้ใช้ response ตอนสร้างใบแจ้งหนี้หรือ webhook `invoice.paid`
+`invoices.get()` จะคืนรูปแบบใบแจ้งหนี้สาธารณะที่หน้า checkout แบบโฮสต์ใช้ โดยมีฟิลด์สำหรับ checkout เช่น `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers` และ `direct_onchain_rails` แต่ไม่มี `reference_id` ถ้าต้องใช้ `reference_id` ฝั่ง merchant ให้ใช้ response ตอนสร้างใบแจ้งหนี้หรือ webhook `invoice.paid`
 
 ยอดเงินในการตอบกลับถูกปรับให้เป็นทศนิยม 4 ตำแหน่งเสมอ: สร้างด้วย `'129'` ใบแจ้งหนี้จะตอบกลับ `amount: '129.0000'` เวลาจะเทียบยอดเงินให้เทียบเป็นตัวเลข อย่าเทียบเป็นสตริง
-`amount_due` คำนวณจาก `max(amount - amount_paid, 0)` และใช้สเกลทศนิยม 18 ตำแหน่งเหมือน `amount_paid`
+`amount_due` คำนวณจาก `max(amount - amount_paid, 0)` และใช้สเกลทศนิยม 18 ตำแหน่งเหมือน `amount_paid` ขณะที่ `amount_overpaid` เป็นภาพสะท้อนของมัน คือ `max(amount_paid - amount, 0)` คุณจึงไม่ต้องลบเงินเอง `monitoring_status` มีค่าเป็น `'active'` หรือ `'ended'` — พอเป็น `'ended'` แล้ว ที่อยู่รับเงินจะไม่ถูกเฝ้าดูอีกต่อไป — ส่วน `transfers` คือรายการรับเงินบนเชนที่ยืนยันแล้ว (แต่ละรายการมี `tx_hash`, `amount` และ `explorer_tx_url`) ทั้งคู่จะเป็น `null` / `[]` สำหรับใบแจ้งหนี้ทดสอบ
 
 ถ้าเกิดข้อผิดพลาด ทุกเมธอดจะคืน `Promise` ที่ reject พร้อมข้อผิดพลาดต่อไปนี้:
 
@@ -266,10 +266,12 @@ const result = await checkout.result
 
 `Promise` ของ `result` จะ resolve เสมอและไม่มีวัน reject ด้วยค่าใดค่าหนึ่งต่อไปนี้:
 
-- `{ status: 'paid' | 'overpaid', invoiceId }` — ยืนยันการจ่ายแล้ว หน้าชำระเงินจะค้างอยู่ที่หน้าจอสำเร็จจนกว่าผู้ซื้อจะปิดเอง ถ้าคุณจะเปลี่ยนหน้าทันทีให้เรียก `checkout.close()` ก่อน
-- `{ status: 'review_required', invoiceId }` — ได้รับการชำระเงินแล้ว แต่ต้องผ่านการตรวจสอบโดยเจ้าหน้าที่ก่อน แสดงสถานะรอตรวจสอบ และอย่าใช้ผลจากเบราว์เซอร์เพื่อจัดการคำสั่งซื้อ
+- `{ status: 'paid' | 'overpaid', invoiceId, mode }` — ยืนยันการจ่ายแล้ว หน้าชำระเงินจะค้างอยู่ที่หน้าจอสำเร็จจนกว่าผู้ซื้อจะปิดเอง ถ้าคุณจะเปลี่ยนหน้าทันทีให้เรียก `checkout.close()` ก่อน
+- `{ status: 'review_required', invoiceId, mode }` — ได้รับการชำระเงินแล้ว แต่ต้องผ่านการตรวจสอบโดยเจ้าหน้าที่ก่อน แสดงสถานะรอตรวจสอบ และอย่าใช้ผลจากเบราว์เซอร์เพื่อจัดการคำสั่งซื้อ
 - `{ status: 'closed', invoiceId, reason }` — ปิดไปโดยยังไม่จ่าย `reason` เป็นได้ทั้ง `'user'` (กดปุ่มปิดหรือ Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (มีการเรียก `openCheckout` ครั้งใหม่), หรือ `'aborted'` (`signal` ถูกยิง)
 - `{ status: 'failed', invoiceId }` — หน้าชำระเงินโหลดไม่เสร็จภายใน 15 วินาที
+
+ในผลลัพธ์การชำระเงิน `mode` จะเป็น `'test'` หรือ `'live'` — เป็นคำใบ้ที่ช่วยให้คุณแยกแยะการจ่ายเงินทดสอบแบบจำลองออกจากเงินจริงบนเบราว์เซอร์ได้ ค่านี้ใช้อ้างอิงเท่านั้น ให้ยืนยันการจัดการคำสั่งซื้อบนเซิร์ฟเวอร์ของคุณด้วย webhook `invoice.paid` เสมอ
 
 ตัว `openCheckout` เองจะโยนข้อผิดพลาดเมื่ออินพุตไม่ถูกต้อง (`invoiceId` ต้องขึ้นต้นด้วย `inv_`) และบนเบราว์เซอร์ที่ไม่รองรับ Shadow DOM หน้าชำระเงินเปิดได้ทีละหนึ่งเท่านั้น เปิดอันใหม่จะปิดอันเก่าด้วย `reason: 'replaced'`
 

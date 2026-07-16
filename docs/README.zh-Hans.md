@@ -236,10 +236,10 @@ const invoq = new Invoq(apiKey, {
 - `invoq.invoices.get(invoiceId)` —— 查询公开账单。
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` —— 在测试账单上模拟付款。
 
-`invoices.get()` 返回托管收银页使用的公开账单结构。它包含面向收银台的字段，例如 `amount_paid`、`amount_due`、`payment_status`、`project`、`deposit_address`、`monitoring_ends_at` 和 `direct_onchain_rails`，但不包含 `reference_id`。如果需要商户侧的 `reference_id`，请使用创建账单的响应或 `invoice.paid` webhook。
+`invoices.get()` 返回托管收银页使用的公开账单结构。它包含面向收银台的字段，例如 `amount_paid`、`amount_due`、`amount_overpaid`、`payment_status`、`project`、`deposit_address`、`monitoring_ends_at`、`monitoring_status`、`transfers` 和 `direct_onchain_rails`，但不包含 `reference_id`。如果需要商户侧的 `reference_id`，请使用创建账单的响应或 `invoice.paid` webhook。
 
 响应里的金额统一格式化为 4 位小数：用 `'129'` 创建，账单返回 `amount: '129.0000'`。比较金额请按数值比，不要按字符串比。
-`amount_due` 按 `max(amount - amount_paid, 0)` 派生，使用和 `amount_paid` 相同的 18 位小数 scale。
+`amount_due` 按 `max(amount - amount_paid, 0)` 派生，使用和 `amount_paid` 相同的 18 位小数 scale；`amount_overpaid` 与它互为镜像，即 `max(amount_paid - amount, 0)`，所以你不必自己做减法。`monitoring_status` 取值 `'active'` 或 `'ended'`——一旦变为 `'ended'`，收款地址就不再被监控——而 `transfers` 是已确认的链上收款记录（每一项都含 `tx_hash`、`amount` 和 `explorer_tx_url`）。测试账单里两者分别为 `null` / `[]`。
 
 所有方法失败时都会 reject，并带上以下错误：
 
@@ -266,10 +266,12 @@ const result = await checkout.result
 
 `result` 一定会 resolve（绝不 reject），取值是下面几种之一：
 
-- `{ status: 'paid' | 'overpaid', invoiceId }` —— 付款已确认。弹窗会停留在内嵌页的成功画面，直到买家自己关掉；如果你要立刻跳转页面，先调用 `checkout.close()`。
-- `{ status: 'review_required', invoiceId }` —— 已收到付款，但需要人工审核。展示待审核状态；不要凭浏览器结果处理订单。
+- `{ status: 'paid' | 'overpaid', invoiceId, mode }` —— 付款已确认。弹窗会停留在内嵌页的成功画面，直到买家自己关掉；如果你要立刻跳转页面，先调用 `checkout.close()`。
+- `{ status: 'review_required', invoiceId, mode }` —— 已收到付款，但需要人工审核。展示待审核状态；不要凭浏览器结果处理订单。
 - `{ status: 'closed', invoiceId, reason }` —— 没付款就关闭了。`reason` 取值：`'user'`（点了关闭按钮或按了 Escape）、`'programmatic'`（调用了 `checkout.close()`）、`'replaced'`（又调用了一次 `openCheckout`）、`'aborted'`（`signal` 被触发）。
 - `{ status: 'failed', invoiceId }` —— 收银台 15 秒内没有加载出来。
+
+在付款结果里，`mode` 取值 `'test'` 或 `'live'`——这是一个提示，方便你在浏览器里把模拟的测试付款和真钱区分开。它仅供参考：请务必在你的服务端用 `invoice.paid` webhook 确认履约。
 
 `openCheckout` 本身只在入参不合法（`invoiceId` 必须以 `inv_` 开头）以及浏览器不支持 Shadow DOM 时抛错。同一时间只会有一个收银台弹窗；再开一个，前一个会以 `reason: 'replaced'` 关闭。
 

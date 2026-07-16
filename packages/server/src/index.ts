@@ -17,8 +17,10 @@ export type {
   InvoicePaidStatus,
   InvoicePaymentStatus,
   InvoiceStatus,
+  MonitoringStatus,
   PublicInvoice,
   PublicInvoiceProject,
+  PublicInvoiceTransfer,
   TestPaymentInvoice,
   WebhookRawBody,
 } from './types'

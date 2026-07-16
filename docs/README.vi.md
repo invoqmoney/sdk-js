@@ -236,10 +236,10 @@ const invoq = new Invoq(apiKey, {
 - `invoq.invoices.get(invoiceId)` — lấy thông tin hóa đơn công khai.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — mô phỏng thanh toán trên hóa đơn thử nghiệm.
 
-`invoices.get()` trả về dạng hóa đơn công khai mà trang checkout được host sử dụng. Nó bao gồm các trường dành cho checkout như `amount_paid`, `amount_due`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at` và `direct_onchain_rails`, nhưng không bao gồm `reference_id`. Hãy dùng phản hồi tạo hóa đơn hoặc webhook `invoice.paid` khi bạn cần `reference_id` phía merchant.
+`invoices.get()` trả về dạng hóa đơn công khai mà trang checkout được host sử dụng. Nó bao gồm các trường dành cho checkout như `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers` và `direct_onchain_rails`, nhưng không bao gồm `reference_id`. Hãy dùng phản hồi tạo hóa đơn hoặc webhook `invoice.paid` khi bạn cần `reference_id` phía merchant.
 
 Số tiền trong phản hồi được chuẩn hóa về 4 chữ số lẻ: tạo với `'129'` thì hóa đơn trả về `amount: '129.0000'`. So sánh số tiền theo giá trị số, đừng so sánh chuỗi.
-`amount_due` được tính là `max(amount - amount_paid, 0)` và dùng cùng thang 18 chữ số thập phân như `amount_paid`.
+`amount_due` được tính là `max(amount - amount_paid, 0)` và dùng cùng thang 18 chữ số thập phân như `amount_paid`; `amount_overpaid` là bản đối xứng của nó, `max(amount_paid - amount, 0)`, nên bạn không bao giờ phải tự trừ tiền. `monitoring_status` là `'active'` hoặc `'ended'` — khi đã là `'ended'`, địa chỉ nạp tiền không còn được theo dõi nữa — còn `transfers` là danh sách biên nhận trên chuỗi đã xác nhận (mỗi mục có `tx_hash`, `amount` và `explorer_tx_url`). Cả hai đều là `null` / `[]` với hóa đơn thử nghiệm.
 
 Khi thất bại, mọi phương thức trả về `Promise` bị reject với một trong các lỗi sau:
 
@@ -266,10 +266,12 @@ const result = await checkout.result
 
 `Promise` của `result` luôn resolve và không bao giờ reject, với một trong các giá trị:
 
-- `{ status: 'paid' | 'overpaid', invoiceId }` — thanh toán đã xác nhận. Cửa sổ vẫn mở ở màn hình thành công cho đến khi người mua tự đóng; nếu bạn muốn chuyển trang ngay, hãy gọi `checkout.close()` trước.
-- `{ status: 'review_required', invoiceId }` — đã nhận thanh toán nhưng cần duyệt thủ công. Hiển thị trạng thái chờ duyệt; đừng xử lý đơn từ kết quả trình duyệt.
+- `{ status: 'paid' | 'overpaid', invoiceId, mode }` — thanh toán đã xác nhận. Cửa sổ vẫn mở ở màn hình thành công cho đến khi người mua tự đóng; nếu bạn muốn chuyển trang ngay, hãy gọi `checkout.close()` trước.
+- `{ status: 'review_required', invoiceId, mode }` — đã nhận thanh toán nhưng cần duyệt thủ công. Hiển thị trạng thái chờ duyệt; đừng xử lý đơn từ kết quả trình duyệt.
 - `{ status: 'closed', invoiceId, reason }` — đóng mà chưa thanh toán. `reason` là `'user'` (nút đóng hoặc phím Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (một lệnh `openCheckout` khác), hoặc `'aborted'` (`signal` được kích hoạt).
 - `{ status: 'failed', invoiceId }` — trang thanh toán không tải xong trong 15 giây.
+
+Ở kết quả thanh toán, `mode` là `'test'` hoặc `'live'` — một gợi ý để bạn phân biệt được một khoản thanh toán thử nghiệm mô phỏng với tiền thật ngay trên trình duyệt. Nó chỉ mang tính tham khảo: hãy luôn xác nhận việc xử lý đơn hàng trên máy chủ của bạn bằng webhook `invoice.paid`.
 
 Bản thân `openCheckout` sẽ ném lỗi khi tham số không hợp lệ (`invoiceId` phải bắt đầu bằng `inv_`) và trên trình duyệt không hỗ trợ Shadow DOM. Mỗi lúc chỉ có một trang thanh toán mở; mở cái mới sẽ đóng cái cũ với `reason: 'replaced'`.
 
