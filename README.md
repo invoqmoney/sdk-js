@@ -102,7 +102,7 @@ Notes:
 
 - The server examples are Web Fetch API route handlers (Next.js App Router, Hono, and similar). In Express, send the response with `res.json({ invoiceId: invoice.id })` instead.
 - Use a server-side amount. Do not trust client-supplied amounts.
-- `amount` is a decimal USD string from `'0.01'` to `'999.99'` with up to 2 decimal places, such as `'129'` or `'129.99'`.
+- `amount` is a decimal USD string from `'0.01'` to `'1000000.00'` with up to 2 decimal places, such as `'129'` or `'129.99'`.
 - Use `reference_id` to map `invoice.paid` webhooks back to your order. It also makes creation retry-safe: creating again with the same `reference_id` and the same invoice terms returns the existing invoice instead of a duplicate, while different terms fail with a `409 reference_id_conflict` API error.
 
 In your frontend, call your server endpoint first, then pass the returned `invoiceId` to checkout:

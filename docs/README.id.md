@@ -104,7 +104,7 @@ Catatan:
 
 - Contoh servernya berupa handler rute berbasis Web Fetch API (Next.js App Router, Hono, dan sejenisnya). Di Express, kirim responsnya dengan `res.json({ invoiceId: invoice.id })`.
 - Tentukan jumlahnya di sisi server. Jangan percaya jumlah yang dikirim klien.
-- `amount` adalah string desimal USD dari `'0.01'` sampai `'999.99'` dengan maksimal 2 angka di belakang koma, misalnya `'129'` atau `'129.99'`.
+- `amount` adalah string desimal USD dari `'0.01'` sampai `'1000000.00'` dengan maksimal 2 angka di belakang koma, misalnya `'129'` atau `'129.99'`.
 - Pakai `reference_id` untuk memetakan webhook `invoice.paid` kembali ke pesanan Anda. Ini juga membuat pembuatan invoice aman diulang: membuat lagi dengan `reference_id` yang sama dan ketentuan invoice yang sama mengembalikan invoice yang sudah ada, bukan duplikat, sementara ketentuan yang berbeda gagal dengan error API `409 reference_id_conflict`.
 
 Di frontend, panggil endpoint server Anda dulu, lalu teruskan `invoiceId` yang dikembalikan ke checkout:

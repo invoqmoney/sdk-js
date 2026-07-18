@@ -104,7 +104,7 @@ Notlar:
 
 - Sunucu örnekleri Web Fetch API tabanlı rota işleyicileridir (Next.js App Router, Hono ve benzerleri). Express'te yanıtı `res.json({ invoiceId: invoice.id })` ile gönderin.
 - Tutarı sunucu tarafında belirleyin. İstemciden gelen tutarlara güvenmeyin.
-- `amount`, `'0.01'` ile `'999.99'` arasında, en fazla 2 ondalık basamaklı, USD cinsinden ondalık bir dizedir — örneğin `'129'` veya `'129.99'`.
+- `amount`, `'0.01'` ile `'1000000.00'` arasında, en fazla 2 ondalık basamaklı, USD cinsinden ondalık bir dizedir — örneğin `'129'` veya `'129.99'`.
 - `invoice.paid` webhook'larını siparişinize geri bağlamak için `reference_id` kullanın. Oluşturmayı yeniden denemeyi de güvenli kılar: aynı `reference_id` ve aynı fatura koşullarıyla tekrar oluşturursanız kopya yerine mevcut faturayı alırsınız; farklı koşullar ise `409 reference_id_conflict` API hatasıyla başarısız olur.
 
 Ön uçta önce kendi sunucu uç noktanızı çağırın, dönen `invoiceId`'yi ödeme sayfasına verin:

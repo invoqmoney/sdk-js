@@ -104,7 +104,7 @@ export async function POST() {
 
 - 伺服器端範例是 Web Fetch API 的路由處理函式（Next.js App Router、Hono 等都適用）。用 Express 的話，改成以 `res.json({ invoiceId: invoice.id })` 回應即可。
 - 金額要由伺服器端決定，不要相信用戶端傳來的金額。
-- `amount` 是 `'0.01'` 到 `'999.99'` 之間的十進位美元字串，最多兩位小數，例如 `'129'` 或 `'129.99'`。
+- `amount` 是 `'0.01'` 到 `'1000000.00'` 之間的十進位美元字串，最多兩位小數，例如 `'129'` 或 `'129.99'`。
 - 用 `reference_id` 把 `invoice.paid` webhook 對應回你的訂單。它也讓建立動作可以放心重試：用相同的 `reference_id` 和相同的帳單條件再建立一次，回傳的是既有帳單而不是重複開單；條件不同則會回 `409 reference_id_conflict` API 錯誤。
 
 前端先呼叫你自己的伺服器端點，再把回傳的 `invoiceId` 交給結帳頁：
