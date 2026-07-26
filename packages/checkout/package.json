@@ -59,7 +59,7 @@
   "scripts": {
     "build": "tsdown",
     "prepack": "pnpm build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.check.json",
     "test": "vitest run --environment happy-dom"
   }
 }

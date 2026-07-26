@@ -99,9 +99,8 @@ export async function requestJson<T>(
   return envelope.data as T
 }
 
-// The only signal passed to fetch is the SDK's own timeout signal, so an
-// abort is always a timeout. Node 20.0-20.7 reports it as AbortError instead
-// of TimeoutError when it fires mid-body (nodejs/undici#2171).
+// The only signal we pass is our own timeout, so any abort is one — some Node
+// versions report it as AbortError when it fires mid-body.
 function isTimeoutError(error: unknown): boolean {
   return (
     error instanceof Error &&

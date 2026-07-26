@@ -1,5 +1,7 @@
 export type OpenCheckoutOptions = {
   checkoutOrigin?: string
+  // BCP 47 tag for the checkout UI. Defaults to the payer's browser languages.
+  locale?: string
   styleNonce?: string
   signal?: AbortSignal
 }
@@ -10,9 +12,8 @@ export type Checkout = {
   close: () => void
 }
 
-// Whether the paid invoice was a real live payment or a simulated test-mode
-// one. Advisory only: it lets you branch UI in the browser, but fulfillment
-// must still be confirmed server-side via the `invoice.paid` webhook.
+// Real payment or simulated test-mode one. Advisory: fulfill on the
+// `invoice.paid` webhook, never on a browser result.
 export type CheckoutMode = 'test' | 'live'
 
 export type CheckoutResult =

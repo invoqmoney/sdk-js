@@ -9,7 +9,9 @@ import type {
   InvoiceMode,
   InvoicePaidEvent,
   InvoicePaidStatus,
+  InvoicePaymentReversedEvent,
   InvoqWebhookEvent,
+  WebhookEventType,
   WebhookRawBody,
 } from './types'
 
@@ -85,32 +87,54 @@ export function verifyWebhook(
 export function isInvoicePaid(
   event: InvoqWebhookEvent,
 ): event is InvoicePaidEvent {
+  const invoice = lifecycleEventInvoice(event, 'invoice.paid')
+
+  // Paid-equivalent statuses only: review_required has money against it but is
+  // not cleared for fulfillment.
+  return invoice !== null && isInvoicePaidStatus(invoice.status)
+}
+
+export function isInvoicePaymentReversed(
+  event: InvoqWebhookEvent,
+): event is InvoicePaymentReversedEvent {
+  // No status check, unlike the paid guard: rejecting an unrecognized status
+  // would drop the event and leave the order fulfilled on a vanished payment.
+  return lifecycleEventInvoice(event, 'invoice.payment_reversed') !== null
+}
+
+// The fields both lifecycle events share, returned so each guard can apply its
+// own status rule. null when this is not a well-formed event of that type.
+function lifecycleEventInvoice(
+  event: InvoqWebhookEvent,
+  type: WebhookEventType,
+): Record<string, unknown> | null {
   if (
     !isRecord(event) ||
-    event.type !== 'invoice.paid' ||
+    event.type !== type ||
     typeof event.id !== 'string' ||
     !isInvoiceMode(event.mode) ||
     typeof event.created_at !== 'string' ||
     !isRecord(event.data) ||
     !isRecord(event.data.invoice)
   ) {
-    return false
+    return null
   }
 
   const invoice = event.data.invoice
-
-  return (
+  const valid =
     typeof invoice.id === 'string' &&
     isInvoiceMode(invoice.mode) &&
-    isInvoicePaidStatus(invoice.status) &&
+    typeof invoice.status === 'string' &&
     typeof invoice.amount === 'string' &&
     invoice.currency === 'USD' &&
     typeof invoice.amount_paid === 'string' &&
     (typeof invoice.reference_id === 'string' ||
       invoice.reference_id === null) &&
+    Number.isInteger(invoice.payment_revision) &&
     (typeof invoice.fully_paid_at === 'string' ||
       invoice.fully_paid_at === null)
-  )
+
+  return valid ? invoice : null
 }
 
 function parseSignatureHeader(signatureHeader: string): {

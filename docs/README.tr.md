@@ -63,6 +63,7 @@ npm install @invoq/checkout
 1. [invoq paneline](https://app.invoq.money) giriş yapın ve bir proje oluşturun.
 2. **API keys** sayfasında bir gizli anahtar oluşturun. Test anahtarları `sk_test_` ile, canlı anahtarlar `sk_live_` ile başlar. Anahtarın modu, faturaların test mi canlı mı olacağını belirler.
 3. Projenizin **webhooks** ayarlarında webhook URL'nizi kaydedin. O modun webhook sırrı (`whsec_...`) yalnızca bir kez, webhook'u ilk etkinleştirdiğinizde gösterilir — hemen saklayın. Webhook URL'leri herkese açık HTTPS URL'leri olmalı.
+4. Canlıya geçmeden önce **Receiving wallet** ayarınızı yapın. Test faturaları buna ihtiyaç duymaz; paranın gideceği yer olmayan canlı bir fatura `409 no_payment_options_available` ile başarısız olur.
 
 İkisini de sunucu ortamınıza ekleyin:
 
@@ -91,7 +92,6 @@ const invoq = new Invoq(process.env.INVOQ_SECRET_KEY!)
 export async function POST() {
   const invoice = await invoq.invoices.create({
     amount: '129',
-    currency: 'USD',
     description: 'SaaS boilerplate',
     reference_id: 'order_1234',
   })
@@ -104,7 +104,7 @@ Notlar:
 
 - Sunucu örnekleri Web Fetch API tabanlı rota işleyicileridir (Next.js App Router, Hono ve benzerleri). Express'te yanıtı `res.json({ invoiceId: invoice.id })` ile gönderin.
 - Tutarı sunucu tarafında belirleyin. İstemciden gelen tutarlara güvenmeyin.
-- `amount`, `'0.01'` ile `'1000000.00'` arasında, en fazla 2 ondalık basamaklı, USD cinsinden ondalık bir dizedir — örneğin `'129'` veya `'129.99'`.
+- `amount`, `'0.01'` ile `'1000000.00'` arasında, en fazla 2 ondalık basamaklı, USD cinsinden ondalık bir dizedir — örneğin `'129'` veya `'129.99'`. Para birimi her zaman USD'dir ve test mi live mı olduğu anahtardan gelir — ikisi de istek alanı değildir.
 - `invoice.paid` webhook'larını siparişinize geri bağlamak için `reference_id` kullanın. Oluşturmayı yeniden denemeyi de güvenli kılar: aynı `reference_id` ve aynı fatura koşullarıyla tekrar oluşturursanız kopya yerine mevcut faturayı alırsınız; farklı koşullar ise `409 reference_id_conflict` API hatasıyla başarısız olur.
 
 Ön uçta önce kendi sunucu uç noktanızı çağırın, dönen `invoiceId`'yi ödeme sayfasına verin:
@@ -158,7 +158,9 @@ export async function POST(request: Request) {
 }
 ```
 
-Siparişleri sunucunuzda `invoice.paid` webhook'larıyla işleyin. `isInvoicePaid(event)` true olduğunda fatura otomatik olarak işlenmeye hazırdır; faturadaki `reference_id` ile siparişinizi bulup işleyin. `review_required` durumundaki fatura şu anda `invoice.paid` webhook'u göndermez; checkout `review_required` döndürürse inceleme bekleyen bir durum gösterin ve inceleme onaylandıktan sonra gelecek `invoice.paid` webhook'unu bekleyin.
+Siparişleri sunucunuzda `invoice.paid` webhook'larıyla işleyin. `isInvoicePaid(event)` true olduğunda fatura otomatik olarak işlenmeye hazırdır; siparişinizi faturanın `reference_id` değeriyle bulun. `review_required` durumundaki bir fatura, inceleme sonuçlanana kadar hiç `invoice.paid` göndermez.
+
+invoq, daha önce ödenmiş bir fatura kendi tutarının altına geri düştüğünde `invoice.payment_reversed` de gönderir — örneğin zincir reorg'u onaylanmış bir transferi düşürdüğünde. Bunu `isInvoicePaymentReversed(event)` ile yakalayın ve kendi politikanıza göre siparişi bekletin veya geri alın.
 
 Tarayıcıdaki `paid`, `overpaid` ve `review_required` sonuçları yalnızca arayüz için sinyaldir. Siparişleri tarayıcı sonuçlarına göre işlemeyin. Canlı ortamda bu akışın etrafına kendi yükleme durumunuzu ve hata yönetiminizi ekleyin.
 
@@ -180,7 +182,7 @@ console.log(paid.status) // 'paid'
 
 `createTestPayment` yalnızca `sk_test_` anahtarıyla oluşturulmuş faturalarda çalışır. Ödemeler fatura tutarına ulaştığında fatura `paid` olur ve invoq, test webhook URL'nize gerçekten imzalanmış bir `invoice.paid` webhook'u gönderir — yani bütün sipariş işleme yolunuz sınanmış olur. Kısmi tutarlara izin verilir; sonuç `partially_paid` olur.
 
-Webhook'ları kendi makinenizde almak için yerel sunucunuzu ngrok veya cloudflared gibi bir HTTPS tüneliyle dışa açın ve tünel URL'sini panelde test webhook URL'niz olarak kaydedin. Panel, bağlantıyı denetlemek için imzalı bir `webhook.ping` de gönderebilir.
+Webhook'ları kendi makinenizde almak için yerel sunucunuzu ngrok veya cloudflared gibi bir HTTPS tüneliyle dışa açın ve tünel URL'sini panelde test webhook URL'niz olarak kaydedin.
 
 ## Canlı ortamda webhook'lar
 
@@ -215,9 +217,9 @@ app.post(
 )
 ```
 
-**Tekrar geldiğinde güvenli olacak şekilde işleyin.** Başarısız teslimatlar yeniden denenir (birkaç saate yayılan en fazla 5 deneme, denemeler arası süre giderek artar); uç noktanız aynı olayı birden fazla kez alabilir. İşlenmiş siparişleri `reference_id` veya fatura `id`'siyle takip edin, tekrar gelen teslimatları yok sayın.
+**Tekrar geldiğinde güvenli olacak şekilde işleyin.** Başarısız teslimatlar yeniden denenir (en fazla 5 deneme; aralar 1 dakika, 5 dakika, 30 dakika, ardından 2 saat); uç noktanız aynı olayı birden fazla kez alabilir. İşlenmiş siparişleri `reference_id` veya fatura `id`'siyle takip edin, tekrar gelen teslimatları yok sayın. Teslimatlar sırasız da gelebilir — `payment_revision` değeri en yüksek olan anlık görüntüyü saklayın.
 
-**Hızla 2xx dönün.** Diğer her durum kodu başarısız teslimat sayılır: zaman aşımları, `429` ve `5xx` yeniden denenir, diğer `4xx` yanıtları denenmez.
+**Hızla 2xx dönün.** Diğer her durum kodu başarısız teslimat sayılır ve yeniden denenir; yönlendirmeler ve `4xx` yanıtları da buna dahildir; yani bir dağıtım penceresi ya da geçici olarak yanlış yönlenmiş bir yol atılmaz, yeniden denenir.
 
 İmza eksikse, geçersizse ya da zaman damgası 5 dakikadan fazla kaymışsa `verifyWebhook`, `InvoqSignatureVerificationError` fırlatır — 400 ile yanıtlayın. İmza başlığı `invoq-signature: t=<unix saniye>,v1=<"<t>.<ham gövde>" değerinin onaltılık HMAC-SHA256'sı>` biçimindedir; yani istediğiniz dilde kendiniz de doğrulayabilirsiniz.
 
@@ -232,14 +234,17 @@ const invoq = new Invoq(apiKey, {
 })
 ```
 
-- `invoq.invoices.create(input)` — fatura oluşturur. `input`: `amount` (zorunlu), `currency` (`'USD'`, varsayılan), `description`, `reference_id`, `return_url`.
+- `invoq.invoices.create(input)` — fatura oluşturur. `input`: `amount` (zorunlu), `description`, `reference_id`, `return_url`.
 - `invoq.invoices.get(invoiceId)` — herkese açık faturayı getirir.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — test faturasında ödeme simüle eder.
 
-`invoices.get()` barındırılan checkout sayfasının kullandığı herkese açık fatura şeklini döndürür. `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers` ve `direct_onchain_rails` gibi checkout'a yönelik alanları içerir, ancak `reference_id` içermez. Merchant `reference_id` değeriniz gerektiğinde oluşturma yanıtını veya `invoice.paid` webhook'unu kullanın.
+`invoices.get()` barındırılan checkout sayfasının kullandığı herkese açık fatura şeklini döndürür: oluşturma yanıtının şekli, artı `amount_paid`, `project` ve `transfers`, eksi `reference_id`. Merchant `reference_id` değeriniz gerektiğinde oluşturma yanıtını veya `invoice.paid` webhook'unu kullanın.
 
-Yanıtlardaki tutarlar 4 ondalık basamağa normalize edilir: `'129'` ile oluşturun, fatura `amount: '129.0000'` döndürür. Tutarları dize olarak değil, sayısal karşılaştırın.
-`amount_due`, `max(amount - amount_paid, 0)` olarak türetilir ve `amount_paid` ile aynı 18 ondalık basamak ölçeğini kullanır; `amount_overpaid` ise onun aynasıdır, `max(amount_paid - amount, 0)`, yani parayı kendiniz çıkarmanız hiç gerekmez. `monitoring_status`, `'active'` ya da `'ended'` olur — `'ended'` olduğunda yatırma adresi artık izlenmez — ve `transfers`, onaylanmış zincir üstü tahsilat kaydıdır (her girdide `tx_hash`, `amount` ve `explorer_tx_url` bulunur). İkisi de test faturaları için `null` / `[]` olur.
+İki durum alanı. `status` muhasebe durumudur — `unpaid`, `partially_paid`, `paid`, `settling`, `settled`, `review_required` — ve ödeme tamamlanmış sayılan üç değer yalnızca paranın cüzdanınıza ne kadar yaklaştığıyla ayrılır. `checkout_status` ödeyenin gördüğüdür — `open`, `confirming`, `expired`, `paid`, `unavailable` — ve siparişi işlemek için asla yetki vermez. `payment_revision`, onaylanmış ödeme kümesi her değiştiğinde artar; böylece elinizdekinden eski bir anlık görüntüyü eleyebilirsiniz.
+
+Yanıtlardaki tutarlar 4 ondalık basamağa normalize edilir: `'129'` ile oluşturun, fatura `amount: '129.0000'` döndürür. Tutarları dize olarak değil, sayısal karşılaştırın. `amount_due`, `max(amount - amount_paid, 0)` olarak türetilir ve `amount_paid` ile aynı 18 ondalık basamak ölçeğini kullanır; `amount_overpaid` ise onun aynasıdır, `max(amount_paid - amount, 0)`, yani parayı kendiniz çıkarmanız hiç gerekmez.
+
+`payment_options` ödeme talimatlarını taşır; oluşturulurken sabitlenir ve test modunda `[]` olur. Girdiler önce `status`, sonra `collection_method` ile ayrışır: yalnızca `'ready'` ödenebilir, `'evm_deposit'` `deposit_address` ve `suggested_amount` taşır, `'direct_exact'` `recipient_address` ile alıcının son hanesine kadar göndermesi gereken `exact_amount` değerini taşır. `transfers` onaylanmış tahsilat kaydıdır — `transaction_id`, `event_index`, `amount`, `explorer_transaction_url` — ve bir ödeme onaylanana kadar `[]` kalır. Tüm alanlar: [REST API belgeleri](https://github.com/invoqmoney/api).
 
 Hata durumunda tüm metotlar, şu hatalarla reject olan bir `Promise` döndürür:
 
@@ -248,13 +253,14 @@ Hata durumunda tüm metotlar, şu hatalarla reject olan bir `Promise` döndürü
 
 İstekler varsayılan olarak 10 saniyede zaman aşımına uğrar (`timeoutMs`). Zaman aşımına uğrayan bir `create`, aynı `reference_id` ile güvenle yeniden denenebilir — mevcut faturayı geri alırsınız, asla kopya oluşmaz.
 
-`verifyWebhook(rawBody, headers, secret)` ham gövdeyi dize, `Uint8Array` veya Node `Buffer`'ı olarak; başlıkları Fetch `Headers` nesnesi ya da düz Node başlık nesnesi olarak kabul eder. Ayrıştırılmış olayı döndürür veya `InvoqSignatureVerificationError` fırlatır. İşlenebilir `invoice.paid` olayları için `isInvoicePaid(event)` kullanın; bu yardımcı ödeme tamamlanmış sayılan fatura durumlarını (`paid`, `settling` veya `settled`) kabul eder ve `review_required` durumunu reddeder.
+`verifyWebhook(rawBody, headers, secret)` ham gövdeyi dize, `Uint8Array` veya Node `Buffer`'ı olarak; başlıkları Fetch `Headers` nesnesi ya da düz Node başlık nesnesi olarak kabul eder. Ayrıştırılmış olayı döndürür veya `InvoqSignatureVerificationError` fırlatır. İşlenebilir `invoice.paid` olayları için `isInvoicePaid(event)` kullanın; bu yardımcı ödeme tamamlanmış sayılan fatura durumlarını (`paid`, `settling` veya `settled`) kabul eder ve `review_required` durumunu reddeder. `invoice.payment_reversed` için `isInvoicePaymentReversed(event)` kullanın. İkisi de olay tipini daraltır; bu SDK sürümünün henüz modellemediği bir olay tipi de doğrulanır ve olduğu gibi döndürülür.
 
 ### `@invoq/checkout`
 
 ```ts
 const checkout = openCheckout(invoiceId, {
   checkoutOrigin: 'https://embed.invoq.money', // isteğe bağlı, varsayılanı değiştirir
+  locale: undefined, // isteğe bağlı, arayüz dili; varsayılan tarayıcının dili
   styleNonce: undefined, // isteğe bağlı, enjekte edilen <style> için CSP nonce'u
   signal: undefined, // isteğe bağlı, pencereyi kapatan AbortSignal
 })
@@ -267,11 +273,13 @@ const result = await checkout.result
 `result` her zaman resolve olur ve asla reject etmez; şunlardan birini döndürür:
 
 - `{ status: 'paid' | 'overpaid', invoiceId, mode }` — ödeme onaylandı. Pencere, müşteri kapatana kadar embed'in başarı ekranında açık kalır; hemen başka sayfaya geçecekseniz önce `checkout.close()` çağırın.
-- `{ status: 'review_required', invoiceId, mode }` — ödeme alındı, ancak manuel inceleme gerekiyor. İnceleme bekleyen durumu gösterin; tarayıcı sonucuna dayanarak siparişi işlemeyin.
+- `{ status: 'review_required', invoiceId, mode }` — ödeme alındı ama elle inceleme için tutuldu. Bekleyen bir durum gösterin.
 - `{ status: 'closed', invoiceId, reason }` — ödeme olmadan kapandı. `reason` şunlardan biri: `'user'` (kapat düğmesi veya Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (başka bir `openCheckout` çağrısı), `'aborted'` (`signal` tetiklendi).
 - `{ status: 'failed', invoiceId }` — ödeme sayfası 15 saniye içinde yüklenmedi.
 
-Ödeme sonuçlarında `mode`, `'test'` veya `'live'` olur — tarayıcıda simüle edilmiş bir test ödemesini gerçek paradan ayırt edebilmeniz için bir ipucu. Yalnızca bilgilendirme amaçlıdır: siparişin işlendiğini her zaman sunucunuzda `invoice.paid` webhook'uyla doğrulayın.
+Ödeme sonuçlarında `mode`, `'test'` ya da `'live'` olur; tarayıcıda simüle edilmiş ödemeyi gerçek paradan böyle ayırırsınız — yalnızca bilgi amaçlı, siparişi webhook ile işleyin.
+
+`locale`, bir BCP 47 etiketi alır (`'fr'`, `'pt-BR'`, `'zh-Hant'`, …). Ödeme sayfası on dil konuşur ve etiketi en yakınına eşler; taşımadığı bir bölge hiçbir zaman hata değildir.
 
 `openCheckout`'un kendisi geçersiz girdide (`invoiceId` `inv_` ile başlamalı) ve Shadow DOM desteklemeyen tarayıcılarda hata fırlatır. Aynı anda yalnızca bir ödeme penceresi açık olur; bir yenisini açmak öncekini `reason: 'replaced'` ile kapatır.
 

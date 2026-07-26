@@ -1,6 +1,8 @@
 export type InvoiceMode = 'test' | 'live'
 export type InvoiceCurrency = 'USD'
 
+// Accounting status. paid/settling/settled all mean the buyer paid and differ
+// only in how far the funds have moved; review_required is not a paid state.
 export type InvoiceStatus =
   | 'unpaid'
   | 'partially_paid'
@@ -9,24 +11,64 @@ export type InvoiceStatus =
   | 'settled'
   | 'review_required'
 
-export type InvoicePaymentStatus = InvoiceStatus | 'confirming'
 export type InvoicePaidStatus = 'paid' | 'settling' | 'settled'
 
-// Server-computed state of the invoice's deposit-address monitoring window.
-// 'ended' means the address is no longer watched. null for test invoices.
-export type MonitoringStatus = 'active' | 'ended'
+// Payer-facing state, derived on every response: paid → confirming (evidence
+// on chain, unconfirmed) → expired (past monitoring_ends_at) → open (an option
+// is ready) → unavailable. Never authorizes fulfillment.
+export type CheckoutStatus =
+  'paid' | 'confirming' | 'expired' | 'open' | 'unavailable'
 
-export type DirectOnchainRail = {
-  chain_namespace: string
+export type ChainNamespace = 'eip155' | 'solana' | 'tron'
+
+export type PaymentOptionCollectionMethod = 'evm_deposit' | 'direct_exact'
+export type PaymentOptionStatus = 'ready' | 'unavailable'
+
+// Identity is (chain_namespace, chain_reference, token_address) — never array
+// position, never the label/symbol/logo fields, which are display metadata.
+type PaymentOptionCommon = {
+  collection_method: PaymentOptionCollectionMethod
+  chain_namespace: ChainNamespace
   chain_reference: string
+  currency: InvoiceCurrency
   token_address: string
+  token_decimals: number
   network_label: string
   display_symbol: string
   logo_url: string | null
   chain_logo_url: string | null
-  network_fee_usd: string
-  eta_seconds: number
+  status: PaymentOptionStatus
 }
+
+// One way to pay, fixed at invoice creation; later config never rewrites it.
+// Only `status` is re-evaluated per response, and only 'ready' pays.
+export type PaymentOption = PaymentOptionCommon &
+  (
+    | {
+        status: 'unavailable'
+      }
+    | {
+        collection_method: 'evm_deposit'
+        status: 'ready'
+        // Address owned by this invoice alone; any on-time transfer credits it.
+        deposit_address: string
+        // Guidance, not a match requirement: max(0, amount_due - pending)
+        // rounded up, so it can exceed amount_due by one token unit.
+        suggested_amount: string
+      }
+    | {
+        collection_method: 'direct_exact'
+        status: 'ready'
+        // The merchant's own address. The buyer must send exactly
+        // `exact_amount` (invoice_amount + matching_increment) in one transfer;
+        // the increment attributes the payment and is never invoice credit.
+        // All three carry exactly token_decimals fractional digits.
+        recipient_address: string
+        invoice_amount: string
+        matching_increment: string
+        exact_amount: string
+      }
+  )
 
 export type Invoice = {
   id: string
@@ -36,15 +78,19 @@ export type Invoice = {
   reference_id: string | null
   description: string | null
   return_url: string | null
-  deposit_address: string | null
   status: InvoiceStatus
+  checkout_status: CheckoutStatus
+  // Increments whenever the confirmed payment set changes; settlement alone
+  // does not move it. Use it to discard a snapshot older than one you hold.
+  payment_revision: number
+  // max(amount - amount_paid, 0) and max(amount_paid - amount, 0), both at the
+  // 18-decimal scale of amount_paid. Read these instead of subtracting money.
   amount_due: string
-  // Excess received beyond the invoiced amount — max(amount_paid - amount, 0),
-  // same 18-decimal scale as amount_paid.
   amount_overpaid: string
+  // One day after creation, and the only payment window. null in test mode.
   monitoring_ends_at: string | null
-  monitoring_status: MonitoringStatus | null
-  direct_onchain_rails: DirectOnchainRail[]
+  // The only place payment instructions live. [] in test mode.
+  payment_options: PaymentOption[]
 }
 
 export type TestPaymentInvoice = Invoice & {
@@ -58,27 +104,30 @@ export type PublicInvoiceProject = {
   logo_url: string | null
 }
 
-// One confirmed inbound transfer credited to the invoice — the payer-facing
-// receipt trail. `amount` is in invoice-currency units at the same scale as
-// amount_paid; `explorer_tx_url` is null when the chain has no usable explorer.
+// One confirmed transfer credited to the invoice. `amount` is invoice currency
+// at the scale of amount_paid, excluding a direct_exact matching increment.
+// `transaction_id` is not unique alone — one transaction can carry several
+// credits, which `event_index` separates.
 export type PublicInvoiceTransfer = {
-  tx_hash: string
+  chain_namespace: ChainNamespace
+  chain_reference: string
+  transaction_id: string
+  event_index: number
   amount: string
-  explorer_tx_url: string | null
+  explorer_transaction_url: string | null
 }
 
 export type PublicInvoice = Omit<Invoice, 'reference_id'> & {
-  amount_paid: string
-  payment_status: InvoicePaymentStatus
   project: PublicInvoiceProject
-  // Confirmed on-chain receipts (see PublicInvoiceTransfer); [] for test
-  // invoices.
+  amount_paid: string
+  // Confirmed receipts, at most the 20 largest, largest first. [] in test mode.
   transfers: PublicInvoiceTransfer[]
 }
 
+// Currency (always USD) and mode (from the key) are not request fields, and
+// the API rejects unknown body keys.
 export type CreateInvoiceInput = {
   amount: string
-  currency?: InvoiceCurrency
   description?: string
   reference_id?: string
   return_url?: string | null
@@ -89,27 +138,50 @@ export type CreateTestPaymentInput = {
   reference_id?: string
 }
 
-export type InvoicePaidEvent = {
+export type WebhookEventType = 'invoice.paid' | 'invoice.payment_reversed'
+
+// Payment instructions and return_url are absent by design: reconcile by
+// invoice id plus reference_id.
+type InvoiceLifecycleEventInvoice = {
   id: string
-  type: 'invoice.paid'
+  mode: InvoiceMode
+  status: InvoiceStatus
+  amount: string
+  currency: InvoiceCurrency
+  amount_paid: string
+  reference_id: string | null
+  payment_revision: number
+  fully_paid_at: string | null
+}
+
+type InvoiceLifecycleEvent<
+  TType extends WebhookEventType,
+  TInvoice extends InvoiceLifecycleEventInvoice,
+> = {
+  id: string
+  type: TType
   mode: InvoiceMode
   created_at: string
   data: {
-    invoice: {
-      id: string
-      mode: InvoiceMode
-      status: InvoicePaidStatus
-      amount: string
-      currency: InvoiceCurrency
-      amount_paid: string
-      reference_id: string | null
-      fully_paid_at: string | null
-    }
+    invoice: TInvoice
   }
 }
 
+export type InvoicePaidEvent = InvoiceLifecycleEvent<
+  'invoice.paid',
+  InvoiceLifecycleEventInvoice & { status: InvoicePaidStatus }
+>
+
+// A paid invoice dropped back below its amount — a reorg removing a credited
+// transfer, say. Carries a higher payment_revision and fully_paid_at: null.
+export type InvoicePaymentReversedEvent = InvoiceLifecycleEvent<
+  'invoice.payment_reversed',
+  InvoiceLifecycleEventInvoice
+>
+
 export type InvoqWebhookEvent =
   | InvoicePaidEvent
+  | InvoicePaymentReversedEvent
   | {
       type: string
       [key: string]: unknown

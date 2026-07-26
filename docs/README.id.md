@@ -63,6 +63,7 @@ Kedua paket ditulis dalam TypeScript dan menyertakan definisi tipe. `@invoq/serv
 1. Masuk ke [dashboard invoq](https://app.invoq.money) dan buat sebuah proyek.
 2. Di halaman **API keys**, buat kunci rahasia (secret key). Kunci uji coba diawali `sk_test_`, kunci produksi diawali `sk_live_`. Mode kuncinya menentukan apakah invoice yang dibuat itu uji coba atau produksi.
 3. Di pengaturan **webhooks** proyek Anda, simpan URL webhook Anda. Kunci rahasia webhook (`whsec_...`) untuk mode itu hanya ditampilkan sekali, saat webhook pertama kali diaktifkan — langsung simpan. URL webhook harus berupa URL HTTPS yang bisa diakses publik.
+4. Siapkan **Receiving wallet** Anda sebelum go live. Invoice uji coba tidak membutuhkannya; invoice live tanpa tujuan penyelesaian gagal dengan `409 no_payment_options_available`.
 
 Tambahkan keduanya ke lingkungan server Anda:
 
@@ -91,7 +92,6 @@ const invoq = new Invoq(process.env.INVOQ_SECRET_KEY!)
 export async function POST() {
   const invoice = await invoq.invoices.create({
     amount: '129',
-    currency: 'USD',
     description: 'SaaS boilerplate',
     reference_id: 'order_1234',
   })
@@ -104,7 +104,7 @@ Catatan:
 
 - Contoh servernya berupa handler rute berbasis Web Fetch API (Next.js App Router, Hono, dan sejenisnya). Di Express, kirim responsnya dengan `res.json({ invoiceId: invoice.id })`.
 - Tentukan jumlahnya di sisi server. Jangan percaya jumlah yang dikirim klien.
-- `amount` adalah string desimal USD dari `'0.01'` sampai `'1000000.00'` dengan maksimal 2 angka di belakang koma, misalnya `'129'` atau `'129.99'`.
+- `amount` adalah string desimal USD dari `'0.01'` sampai `'1000000.00'` dengan maksimal 2 angka di belakang koma, misalnya `'129'` atau `'129.99'`. Mata uangnya selalu USD, dan mode uji coba atau live ditentukan oleh kuncinya — keduanya bukan field permintaan.
 - Pakai `reference_id` untuk memetakan webhook `invoice.paid` kembali ke pesanan Anda. Ini juga membuat pembuatan invoice aman diulang: membuat lagi dengan `reference_id` yang sama dan ketentuan invoice yang sama mengembalikan invoice yang sudah ada, bukan duplikat, sementara ketentuan yang berbeda gagal dengan error API `409 reference_id_conflict`.
 
 Di frontend, panggil endpoint server Anda dulu, lalu teruskan `invoiceId` yang dikembalikan ke checkout:
@@ -158,7 +158,9 @@ export async function POST(request: Request) {
 }
 ```
 
-Gunakan webhook `invoice.paid` untuk memproses pesanan di server Anda. Saat `isInvoicePaid(event)` bernilai true, invoice siap diproses otomatis; pakai `reference_id` dari invoice untuk menemukan dan memproses pesanan Anda. Invoice dengan status `review_required` belum mengirim webhook `invoice.paid`; jika checkout mengembalikan `review_required`, tampilkan status menunggu peninjauan dan tunggu webhook `invoice.paid` berikutnya setelah peninjauan selesai.
+Gunakan webhook `invoice.paid` untuk memproses pesanan di server Anda. Saat `isInvoicePaid(event)` bernilai true, invoice siap diproses otomatis; pakai `reference_id`-nya untuk menemukan pesanan Anda. Invoice dengan status `review_required` tidak mengirim `invoice.paid` sampai peninjauannya selesai.
+
+invoq juga mengirim `invoice.payment_reversed` ketika invoice yang tadinya lunas turun lagi di bawah jumlahnya — misalnya karena reorg rantai membatalkan transfer yang sudah terkonfirmasi. Tangkap event itu dengan `isInvoicePaymentReversed(event)`, lalu tahan atau batalkan pemrosesan sesuai kebijakan Anda sendiri.
 
 Hasil `paid`, `overpaid`, dan `review_required` di browser hanyalah sinyal untuk antarmuka. Jangan memproses pesanan dari hasil browser. Di produksi, tambahkan status memuat dan penanganan error Anda sendiri di sekitar alur ini.
 
@@ -180,7 +182,7 @@ console.log(paid.status) // 'paid'
 
 `createTestPayment` hanya bekerja pada invoice yang dibuat dengan kunci `sk_test_`. Begitu pembayaran mencapai jumlah invoice, invoice menjadi `paid` dan invoq mengirim webhook `invoice.paid` bertanda tangan sungguhan ke URL webhook uji coba Anda — jadi seluruh alur pemrosesan pesanan Anda ikut teruji. Jumlah parsial diperbolehkan dan menghasilkan `partially_paid`.
 
-Untuk menerima webhook di mesin Anda sendiri, buka server lokal lewat tunnel HTTPS seperti ngrok atau cloudflared, lalu simpan URL tunnel-nya sebagai URL webhook uji coba di dashboard. Dashboard juga bisa mengirim `webhook.ping` bertanda tangan untuk mengecek koneksi.
+Untuk menerima webhook di mesin Anda sendiri, buka server lokal lewat tunnel HTTPS seperti ngrok atau cloudflared, lalu simpan URL tunnel-nya sebagai URL webhook uji coba di dashboard.
 
 ## Webhook di produksi
 
@@ -215,9 +217,9 @@ app.post(
 )
 ```
 
-**Proses pesanan secara idempoten.** Pengiriman yang gagal akan diulang (sampai 5 kali selama beberapa jam, dengan jeda yang makin lama), jadi endpoint Anda bisa menerima event yang sama lebih dari sekali. Catat pesanan yang sudah diproses berdasarkan `reference_id` atau `id` invoice, lalu abaikan kiriman ulang.
+**Proses pesanan secara idempoten.** Pengiriman yang gagal akan diulang (sampai 5 kali, dengan jeda 1 menit, 5 menit, 30 menit, lalu 2 jam), jadi endpoint Anda bisa menerima event yang sama lebih dari sekali. Catat pesanan yang sudah diproses berdasarkan `reference_id` atau `id` invoice, lalu abaikan kiriman ulang. Urutan kedatangannya juga tidak dijamin — simpan snapshot dengan `payment_revision` tertinggi.
 
-**Balas 2xx secepatnya.** Status lain dihitung sebagai pengiriman gagal: timeout, `429`, dan `5xx` diulang, sedangkan `4xx` lain tidak.
+**Balas 2xx secepatnya.** Status lain dihitung sebagai pengiriman gagal dan akan diulang — termasuk redirect dan `4xx` — jadi jendela deploy atau rute yang sempat salah akan diulang, bukan dibuang.
 
 `verifyWebhook` melempar `InvoqSignatureVerificationError` saat tanda tangan hilang, tidak valid, atau timestamp-nya meleset lebih dari 5 menit — balas dengan 400. Header tanda tangannya `invoq-signature: t=<detik unix>,v1=<HMAC-SHA256 heks dari "<t>.<isi request mentah>">`, jadi Anda bisa memverifikasinya di bahasa apa pun.
 
@@ -232,14 +234,17 @@ const invoq = new Invoq(apiKey, {
 })
 ```
 
-- `invoq.invoices.create(input)` — membuat invoice. `input`: `amount` (wajib), `currency` (`'USD'`, bawaan), `description`, `reference_id`, `return_url`.
+- `invoq.invoices.create(input)` — membuat invoice. `input`: `amount` (wajib), `description`, `reference_id`, `return_url`.
 - `invoq.invoices.get(invoiceId)` — mengambil invoice publik.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — menyimulasikan pembayaran pada invoice uji coba.
 
-`invoices.get()` mengembalikan bentuk invoice publik yang dipakai halaman checkout ter-hosting. Ini mencakup field untuk checkout seperti `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers`, dan `direct_onchain_rails`, tetapi tidak menyertakan `reference_id`. Gunakan respons pembuatan atau webhook `invoice.paid` saat Anda membutuhkan `reference_id` merchant.
+`invoices.get()` mengembalikan bentuk invoice publik yang dipakai halaman checkout ter-hosting: bentuk respons pembuatan ditambah `amount_paid`, `project`, dan `transfers`, dikurangi `reference_id`. Gunakan respons pembuatan atau webhook `invoice.paid` saat Anda membutuhkan `reference_id` merchant.
 
-Jumlah di respons dinormalkan ke 4 angka desimal: buat dengan `'129'` dan invoice mengembalikan `amount: '129.0000'`. Bandingkan jumlah secara numerik, bukan sebagai string.
-`amount_due` diturunkan sebagai `max(amount - amount_paid, 0)` dan memakai skala 18 desimal yang sama dengan `amount_paid`; `amount_overpaid` adalah kebalikannya, `max(amount_paid - amount, 0)`, jadi Anda tidak perlu mengurangkannya sendiri. `monitoring_status` bernilai `'active'` atau `'ended'` — begitu bernilai `'ended'`, alamat deposit tidak lagi dipantau — dan `transfers` adalah jejak penerimaan on-chain yang sudah terkonfirmasi (tiap entri punya `tx_hash`, `amount`, dan `explorer_tx_url`). Keduanya bernilai `null` / `[]` untuk invoice uji coba.
+Dua field status. `status` adalah status pembukuan — `unpaid`, `partially_paid`, `paid`, `settling`, `settled`, `review_required` — dan tiga nilai yang berarti sudah dibayar hanya berbeda pada seberapa jauh dananya bergerak ke dompet Anda. `checkout_status` adalah status yang dilihat pembayar — `open`, `confirming`, `expired`, `paid`, `unavailable` — dan tidak pernah menjadi izin memproses pesanan. `payment_revision` naik setiap kali kumpulan pembayaran terkonfirmasi berubah, jadi Anda bisa membuang snapshot yang lebih lama dari yang sudah Anda pegang.
+
+Jumlah di respons dinormalkan ke 4 angka desimal: buat dengan `'129'` dan invoice mengembalikan `amount: '129.0000'`. Bandingkan jumlah secara numerik, bukan sebagai string. `amount_due` diturunkan sebagai `max(amount - amount_paid, 0)` dan memakai skala 18 desimal yang sama dengan `amount_paid`; `amount_overpaid` adalah kebalikannya, `max(amount_paid - amount, 0)`, jadi Anda tidak perlu mengurangkannya sendiri.
+
+`payment_options` berisi instruksi pembayarannya, ditetapkan saat pembuatan dan `[]` di mode uji coba. Tiap entri dibedakan oleh `status`, lalu `collection_method`: hanya `'ready'` yang bisa dibayar, `'evm_deposit'` membawa `deposit_address` dan `suggested_amount`, `'direct_exact'` membawa `recipient_address` dan `exact_amount` yang harus dikirim pembeli persis sampai digit terakhir. `transfers` adalah jejak penerimaan terkonfirmasi — `transaction_id`, `event_index`, `amount`, `explorer_transaction_url` — dan tetap `[]` sampai ada pembayaran yang terkonfirmasi. Referensi field lengkap: [dokumen REST API](https://github.com/invoqmoney/api).
 
 Jika gagal, semua metode mengembalikan `Promise` yang di-reject dengan:
 
@@ -248,13 +253,14 @@ Jika gagal, semua metode mengembalikan `Promise` yang di-reject dengan:
 
 Request akan timeout setelah 10 detik secara bawaan (`timeoutMs`). `create` yang timeout aman diulang dengan `reference_id` yang sama — Anda mendapat kembali invoice yang sudah ada, tidak pernah duplikat.
 
-`verifyWebhook(rawBody, headers, secret)` menerima isi request mentah berupa string, `Uint8Array`, atau `Buffer` Node, dan headers berupa objek `Headers` Fetch atau objek header Node biasa. Fungsi ini mengembalikan event yang sudah di-parse atau melempar `InvoqSignatureVerificationError`. Pakai `isInvoicePaid(event)` untuk event `invoice.paid` yang bisa diproses; fungsi ini menerima status invoice yang setara dengan sudah dibayar (`paid`, `settling`, atau `settled`) dan menolak `review_required`.
+`verifyWebhook(rawBody, headers, secret)` menerima isi request mentah berupa string, `Uint8Array`, atau `Buffer` Node, dan headers berupa objek `Headers` Fetch atau objek header Node biasa. Fungsi ini mengembalikan event yang sudah di-parse atau melempar `InvoqSignatureVerificationError`. Pakai `isInvoicePaid(event)` untuk event `invoice.paid` yang bisa diproses; fungsi ini menerima status invoice yang setara dengan sudah dibayar (`paid`, `settling`, atau `settled`) dan menolak `review_required`. Pakai `isInvoicePaymentReversed(event)` untuk `invoice.payment_reversed`. Keduanya mempersempit tipe event; tipe event yang belum dikenal versi SDK ini tetap lolos verifikasi dan dikembalikan apa adanya.
 
 ### `@invoq/checkout`
 
 ```ts
 const checkout = openCheckout(invoiceId, {
   checkoutOrigin: 'https://embed.invoq.money', // opsional, menimpa bawaan
+  locale: undefined, // opsional, bahasa UI; bawaannya bahasa browser pembeli
   styleNonce: undefined, // opsional, nonce CSP untuk <style> yang disuntikkan
   signal: undefined, // opsional, AbortSignal yang menutup jendela
 })
@@ -267,11 +273,13 @@ const result = await checkout.result
 `result` selalu resolve dan tidak pernah reject, dengan salah satu nilai berikut:
 
 - `{ status: 'paid' | 'overpaid', invoiceId, mode }` — pembayaran terkonfirmasi. Modal tetap terbuka menampilkan layar sukses embed sampai pembeli menutupnya; panggil `checkout.close()` dulu kalau Anda langsung berpindah halaman.
-- `{ status: 'review_required', invoiceId, mode }` — pembayaran diterima, tetapi perlu peninjauan manual. Tampilkan status menunggu peninjauan; jangan proses pesanan dari hasil browser.
+- `{ status: 'review_required', invoiceId, mode }` — pembayaran diterima, tetapi ditahan untuk peninjauan manual. Tampilkan status menunggu.
 - `{ status: 'closed', invoiceId, reason }` — ditutup tanpa pembayaran. `reason` bisa `'user'` (tombol tutup atau Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (panggilan `openCheckout` lain), atau `'aborted'` (`signal` terpicu).
 - `{ status: 'failed', invoiceId }` — checkout tidak termuat dalam 15 detik.
 
-Pada hasil pembayaran, `mode` bernilai `'test'` atau `'live'` — petunjuk agar Anda bisa membedakan pembayaran uji coba yang disimulasikan dari uang sungguhan di browser. Ini hanya bersifat indikatif: selalu pastikan pesanan diproses di server Anda lewat webhook `invoice.paid`.
+Pada hasil pembayaran, `mode` bernilai `'test'` atau `'live'`, jadi Anda bisa membedakan pembayaran simulasi dari uang sungguhan di browser — hanya indikatif, proses pesanan lewat webhook.
+
+`locale` menerima tag BCP 47 (`'fr'`, `'pt-BR'`, `'zh-Hant'`, …). Checkout-nya mendukung sepuluh bahasa dan memetakan tag itu ke yang paling dekat, jadi wilayah yang belum ada tidak pernah jadi error.
 
 `openCheckout` sendiri melempar error pada input tidak valid (`invoiceId` harus diawali `inv_`) dan di browser tanpa dukungan Shadow DOM. Hanya satu checkout yang terbuka pada satu waktu; membuka yang lain menutup yang sebelumnya dengan `reason: 'replaced'`.
 

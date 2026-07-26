@@ -9,9 +9,8 @@ import type {
 } from './types'
 
 const DEFAULT_API_ORIGIN = 'https://api.invoq.money'
-// Invoice calls sit in a buyer's checkout click path, so a hung request
-// should fail fast — creates are retry-safe via reference_id. Batch or
-// back-office callers can raise timeoutMs.
+// Invoice calls sit in a checkout click path, so a hung request should fail
+// fast; creates are retry-safe via reference_id. Batch callers raise timeoutMs.
 const DEFAULT_TIMEOUT_MS = 10_000
 
 type Invoices = {
@@ -43,8 +42,7 @@ export class Invoq {
 
     const clientOptions = { apiKey, apiOrigin, timeoutMs }
 
-    // Methods are async so validation errors reject instead of throwing
-    // synchronously, matching the documented "all methods reject" contract.
+    // async so validation errors reject rather than throw synchronously.
     this.invoices = {
       async create(input) {
         return requestJson<Invoice>(clientOptions, {
@@ -77,12 +75,10 @@ export class Invoq {
 function createInvoiceRequestBody(
   input: CreateInvoiceInput,
 ): CreateInvoiceInput {
+  // Only these four fields exist: the API rejects unknown body keys, and
+  // currency (always USD) and mode (from the key) are not request fields.
   const body: CreateInvoiceInput = {
     amount: requiredRequestString(input.amount, 'amount'),
-  }
-
-  if (input.currency !== undefined) {
-    body.currency = input.currency
   }
 
   const description = optionalRequestString(input.description, 'description')
@@ -160,8 +156,8 @@ function requiredRequestString(value: unknown, fieldName: string): string {
   return value
 }
 
-// AbortSignal.timeout() rejects non-integer delays and delays above the
-// uint32 maximum, so catch those at construction time.
+// AbortSignal.timeout() rejects non-integer and above-uint32 delays; catch
+// them at construction instead of on the first request.
 function normalizeTimeoutMs(value: number): number {
   if (!Number.isInteger(value) || value <= 0 || value > 4_294_967_295) {
     throw new InvoqError(

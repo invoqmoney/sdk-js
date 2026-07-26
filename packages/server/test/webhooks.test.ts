@@ -3,15 +3,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   InvoqSignatureVerificationError,
   isInvoicePaid,
+  isInvoicePaymentReversed,
   verifyWebhook,
 } from '../src'
+import type { InvoqWebhookEvent } from '../src'
 
 const secret = 'whsec_test_123'
 const timestamp = 1_710_000_000
+// An event type this version does not model: verification is shape-agnostic,
+// so a new backend event never fails on an older SDK.
 const body =
-  '{"id":"evt_test","type":"webhook.ping","data":{"project":{"id":"proj_test"}}}'
+  '{"id":"evt_test","type":"invoice.future_event","data":{"invoice":{"id":"inv_test"}}}'
 const header =
-  't=1710000000,v1=eeafd628acb4e854f5fd942644490b313220dcc7906303d0c8572050ee7795ff'
+  't=1710000000,v1=7882995406911f86ee0e8a85feba7e21befe10ead08701ff7ff066738ca4c28e'
 
 describe('verifyWebhook', () => {
   afterEach(() => {
@@ -24,10 +28,10 @@ describe('verifyWebhook', () => {
 
     expect(verifyWebhook(body, headersWith(header), secret)).toEqual({
       id: 'evt_test',
-      type: 'webhook.ping',
+      type: 'invoice.future_event',
       data: {
-        project: {
-          id: 'proj_test',
+        invoice: {
+          id: 'inv_test',
         },
       },
     })
@@ -38,22 +42,22 @@ describe('verifyWebhook', () => {
     vi.setSystemTime(new Date(1_710_000_001 * 1000))
 
     const bytes = hexToBytes(
-      '7b226964223a226576745f6279746573222c2274797065223a22776562686f6f6b2e70696e67222c2264617461223a7b2270726f6a656374223a7b226964223a2270726f6a5f6279746573227d7d7d',
+      '7b226964223a226576745f6279746573222c2274797065223a22696e766f6963652e6675747572655f6576656e74222c2264617461223a7b22696e766f696365223a7b226964223a22696e765f6279746573227d7d7d',
     )
     const bytesHeader =
-      't=1710000001,v1=1ee237dd9e509e515eca754c3a34da3536e8c76cfc8ce1fd0a4e74d1366d20e2'
+      't=1710000001,v1=fa0fde1c5d73fe059235b19dc1d7785e1d3c695e055dfcfa8f69a1202bacee37'
 
     expect(
       verifyWebhook(bytes, headersWith(bytesHeader), secret),
     ).toMatchObject({
       id: 'evt_bytes',
-      type: 'webhook.ping',
+      type: 'invoice.future_event',
     })
     expect(
       verifyWebhook(Buffer.from(bytes), headersWith(bytesHeader), secret),
     ).toMatchObject({
       id: 'evt_bytes',
-      type: 'webhook.ping',
+      type: 'invoice.future_event',
     })
   })
 
@@ -65,7 +69,7 @@ describe('verifyWebhook', () => {
       verifyWebhook(body, { 'Invoq-Signature': header }, secret),
     ).toMatchObject({
       id: 'evt_test',
-      type: 'webhook.ping',
+      type: 'invoice.future_event',
     })
   })
 
@@ -77,7 +81,7 @@ describe('verifyWebhook', () => {
       verifyWebhook(body, { 'invoq-signature': [header] }, secret),
     ).toMatchObject({
       id: 'evt_test',
-      type: 'webhook.ping',
+      type: 'invoice.future_event',
     })
   })
 
@@ -140,113 +144,227 @@ describe('verifyWebhook', () => {
   })
 })
 
-describe('isInvoicePaid', () => {
-  it('checks the full invoice.paid shape before narrowing', () => {
-    expect(
-      isInvoicePaid({
-        id: 'evt_paid',
-        type: 'invoice.paid',
-        mode: 'test',
-        created_at: '2026-06-15T00:00:00.000Z',
-        data: {
-          invoice: {
-            id: 'inv_test',
-            mode: 'test',
-            status: 'paid',
-            amount: '149',
-            currency: 'USD',
-            amount_paid: '149',
-            reference_id: 'order_123',
-            fully_paid_at: '2026-06-15T00:00:00.000Z',
-          },
-        },
-      }),
-    ).toBe(true)
+// The snapshot at the moment the invoice was first fully paid.
+const paidInvoice = {
+  id: 'inv_test',
+  mode: 'test',
+  status: 'paid',
+  amount: '149.0000',
+  currency: 'USD',
+  amount_paid: '149.000000000000000000',
+  reference_id: 'order_123',
+  payment_revision: 1,
+  fully_paid_at: '2026-06-15T00:00:00.000Z',
+}
 
-    for (const status of ['settling', 'settled'] as const) {
+// The same invoice after a credited transfer was reversed.
+const reversedInvoice = {
+  ...paidInvoice,
+  status: 'partially_paid',
+  amount_paid: '20.000000000000000000',
+  payment_revision: 2,
+  fully_paid_at: null,
+}
+
+function lifecycleEvent(type: string, invoice: Record<string, unknown>) {
+  return {
+    id: 'wdel_test',
+    type,
+    mode: 'test',
+    created_at: '2026-06-15T00:00:00.000Z',
+    data: { invoice },
+  }
+}
+
+function withoutField(
+  event: Record<string, unknown>,
+  field: string,
+): Record<string, unknown> {
+  const rest = { ...event }
+  delete rest[field]
+
+  return rest
+}
+
+// Every field the shared envelope check requires of data.invoice.
+const invoiceFields = [
+  'id',
+  'mode',
+  'status',
+  'amount',
+  'currency',
+  'amount_paid',
+  'reference_id',
+  'payment_revision',
+  'fully_paid_at',
+]
+
+describe('isInvoicePaid', () => {
+  it('accepts every paid-equivalent status', () => {
+    for (const status of ['paid', 'settling', 'settled'] as const) {
       expect(
-        isInvoicePaid({
-          id: 'evt_paid',
-          type: 'invoice.paid',
-          mode: 'test',
-          created_at: '2026-06-15T00:00:00.000Z',
-          data: {
-            invoice: {
-              id: 'inv_test',
-              mode: 'test',
-              status,
-              amount: '149',
-              currency: 'USD',
-              amount_paid: '149',
-              reference_id: 'order_123',
-              fully_paid_at: '2026-06-15T00:00:00.000Z',
-            },
-          },
-        }),
+        isInvoicePaid(
+          lifecycleEvent('invoice.paid', { ...paidInvoice, status }),
+        ),
       ).toBe(true)
+    }
+  })
+
+  it('checks the full invoice shape before narrowing', () => {
+    for (const field of invoiceFields) {
+      expect(
+        isInvoicePaid(
+          lifecycleEvent('invoice.paid', withoutField(paidInvoice, field)),
+        ),
+      ).toBe(false)
     }
 
     expect(
-      isInvoicePaid({
-        id: 'evt_paid',
-        type: 'invoice.paid',
-        mode: 'test',
-        created_at: '2026-06-15T00:00:00.000Z',
-        data: {
-          invoice: {
-            id: 'inv_test',
-            mode: 'test',
-            status: 'paid',
-            amount: '149',
-            currency: 'USD',
-            reference_id: 'order_123',
-            fully_paid_at: '2026-06-15T00:00:00.000Z',
-          },
-        },
-      }),
+      isInvoicePaid(
+        lifecycleEvent('invoice.paid', {
+          ...paidInvoice,
+          payment_revision: '1',
+        }),
+      ),
     ).toBe(false)
+  })
 
-    expect(
-      isInvoicePaid({
-        id: 'evt_paid',
-        type: 'invoice.paid',
-        mode: 'test',
-        created_at: '2026-06-15T00:00:00.000Z',
-        data: {
-          invoice: {
-            id: 'inv_test',
-            mode: 'test',
-            status: 'review_required',
-            amount: '149',
-            currency: 'USD',
-            amount_paid: '149',
-            reference_id: 'order_123',
-            fully_paid_at: null,
-          },
-        },
-      }),
-    ).toBe(false)
+  it('rejects a mangled envelope around a valid invoice', () => {
+    for (const field of ['id', 'mode', 'created_at', 'data']) {
+      // Cast because stripping an envelope field is exactly what the type
+      // forbids — which is the input this guard has to survive.
+      const mangled = withoutField(
+        lifecycleEvent('invoice.paid', paidInvoice),
+        field,
+      ) as InvoqWebhookEvent
 
+      expect(isInvoicePaid(mangled)).toBe(false)
+    }
+  })
+
+  it('rejects statuses that are not cleared for fulfillment', () => {
+    for (const status of ['review_required', 'partially_paid', 'unexpected']) {
+      expect(
+        isInvoicePaid(
+          lifecycleEvent('invoice.paid', { ...paidInvoice, status }),
+        ),
+      ).toBe(false)
+    }
+  })
+
+  it('rejects a reversal, whatever it reverted the invoice to', () => {
     expect(
-      isInvoicePaid({
-        id: 'evt_paid',
-        type: 'invoice.paid',
-        mode: 'test',
-        created_at: '2026-06-15T00:00:00.000Z',
-        data: {
-          invoice: {
-            id: 'inv_test',
-            mode: 'test',
-            status: 'unexpected',
-            amount: '149',
-            currency: 'USD',
-            amount_paid: '149',
-            reference_id: 'order_123',
-            fully_paid_at: '2026-06-15T00:00:00.000Z',
-          },
-        },
-      }),
+      isInvoicePaid(
+        lifecycleEvent('invoice.payment_reversed', reversedInvoice),
+      ),
     ).toBe(false)
+    expect(
+      isInvoicePaid(
+        lifecycleEvent('invoice.payment_reversed', {
+          ...reversedInvoice,
+          status: 'paid',
+        }),
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('isInvoicePaymentReversed', () => {
+  it('accepts a reversal in any canonical status', () => {
+    for (const status of [
+      'unpaid',
+      'partially_paid',
+      'review_required',
+      'paid',
+      'settling',
+      'settled',
+    ] as const) {
+      expect(
+        isInvoicePaymentReversed(
+          lifecycleEvent('invoice.payment_reversed', {
+            ...reversedInvoice,
+            status,
+          }),
+        ),
+      ).toBe(true)
+    }
+  })
+
+  it('checks the same shared invoice shape', () => {
+    for (const field of invoiceFields) {
+      expect(
+        isInvoicePaymentReversed(
+          lifecycleEvent(
+            'invoice.payment_reversed',
+            withoutField(reversedInvoice, field),
+          ),
+        ),
+      ).toBe(false)
+    }
+  })
+
+  // Must not fail closed like the paid guard: dropping a reversal leaves an
+  // order fulfilled on a payment that no longer exists.
+  it('accepts a status this version does not know', () => {
+    expect(
+      isInvoicePaymentReversed(
+        lifecycleEvent('invoice.payment_reversed', {
+          ...reversedInvoice,
+          status: 'unexpected',
+        }),
+      ),
+    ).toBe(true)
+  })
+
+  it('rejects a paid event', () => {
+    expect(
+      isInvoicePaymentReversed(lifecycleEvent('invoice.paid', paidInvoice)),
+    ).toBe(false)
+  })
+})
+
+// The documented path: verify, then branch. The reads after each guard only
+// compile once the event has narrowed.
+describe('verify then narrow', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('carries a signed lifecycle event through to its typed fields', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(timestamp * 1000))
+
+    const paidBody = JSON.stringify(lifecycleEvent('invoice.paid', paidInvoice))
+    const paid = verifyWebhook(
+      paidBody,
+      headersWith(sign(paidBody, timestamp)),
+      secret,
+    )
+
+    if (!isInvoicePaid(paid)) {
+      throw new Error('expected an invoice.paid event')
+    }
+
+    expect(paid.data.invoice.reference_id).toBe('order_123')
+    expect(paid.data.invoice.payment_revision).toBe(1)
+
+    const reversedBody = JSON.stringify(
+      lifecycleEvent('invoice.payment_reversed', reversedInvoice),
+    )
+    const reversed = verifyWebhook(
+      reversedBody,
+      headersWith(sign(reversedBody, timestamp)),
+      secret,
+    )
+
+    expect(isInvoicePaid(reversed)).toBe(false)
+
+    if (!isInvoicePaymentReversed(reversed)) {
+      throw new Error('expected an invoice.payment_reversed event')
+    }
+
+    expect(reversed.data.invoice.payment_revision).toBe(2)
+    expect(reversed.data.invoice.fully_paid_at).toBeNull()
   })
 })
 
@@ -300,3 +418,24 @@ declare module 'vitest' {
     toThrowSignatureError(code: InvoqSignatureVerificationError['code']): T
   }
 }
+
+// Compile-time contract: an unguarded event exposes no typed invoice, and each
+// guard narrows to exactly its own event.
+function webhookNarrowing(event: InvoqWebhookEvent) {
+  // @ts-expect-error the unmodelled-event member carries no typed data
+  void event.data.invoice.id
+
+  if (isInvoicePaid(event)) {
+    const invoice = event.data.invoice
+    const paidStatus: 'paid' | 'settling' | 'settled' = invoice.status
+    void paidStatus
+    void invoice.fully_paid_at
+    return
+  }
+
+  if (isInvoicePaymentReversed(event)) {
+    void event.data.invoice.payment_revision
+  }
+}
+
+void webhookNarrowing

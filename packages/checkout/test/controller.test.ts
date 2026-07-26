@@ -92,6 +92,16 @@ describe('@invoq/checkout controller', () => {
     expect(style?.nonce).toBe('test-nonce')
   })
 
+  // The tag itself is passed through: the checkout resolves it and falls back
+  // to the payer's browser languages, so a region it lacks is not an error.
+  it('forwards a locale to the embed', () => {
+    openTestCheckout({ locale: 'pt-BR' })
+
+    const { iframe } = getMountedCheckout()
+
+    expect(new URL(iframe.src).searchParams.get('locale')).toBe('pt-BR')
+  })
+
   it('throws invalid input without creating a host', () => {
     expect(() =>
       openCheckout('bad', {
@@ -112,6 +122,14 @@ describe('@invoq/checkout controller', () => {
         checkoutOrigin: 'https://embed.test/pay',
       }),
     ).toThrow('checkoutOrigin must be an absolute http or https origin.')
+    expect(document.body.firstElementChild).toBeNull()
+
+    expect(() =>
+      openCheckout('inv_test_123', {
+        checkoutOrigin: 'https://embed.test',
+        locale: '  ',
+      }),
+    ).toThrow('locale must be a non-empty string.')
     expect(document.body.firstElementChild).toBeNull()
   })
 
@@ -510,6 +528,7 @@ describe('@invoq/checkout controller', () => {
 
 type OpenTestCheckoutOptions = {
   checkoutOrigin?: string
+  locale?: string
   styleNonce?: string
   signal?: AbortSignal
 }
@@ -519,6 +538,7 @@ let openedCheckouts: Checkout[] = []
 function openTestCheckout(options: OpenTestCheckoutOptions = {}): Checkout {
   const checkout = openCheckout('inv_test_123', {
     checkoutOrigin: options.checkoutOrigin ?? 'https://embed.test',
+    locale: options.locale,
     styleNonce: options.styleNonce,
     signal: options.signal,
   })

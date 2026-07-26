@@ -50,6 +50,7 @@ function mountCheckout(
     {
       invoiceId,
       checkoutOrigin: options.checkoutOrigin,
+      locale: options.locale,
     },
     environment.window.location.origin,
     channel,
@@ -59,9 +60,8 @@ function mountCheckout(
     return createAbortedCheckout(invoiceId)
   }
 
-  // Create the new host before tearing down the current checkout so a host
-  // creation failure leaves the current checkout untouched. The new scroll
-  // lock must still be taken after the old one releases.
+  // Built before the current checkout is torn down, so a failure here leaves
+  // that one untouched. The scroll lock still has to wait for its release.
   const host = createCheckoutHost(environment.document, {
     styleNonce: options.styleNonce,
   })
@@ -109,8 +109,8 @@ function mountCheckout(
     closeActiveCheckout(checkout, 'user')
   }
   environment.window.addEventListener('message', handleWindowMessage)
-  // Capture phase so page handlers that stop propagation cannot swallow
-  // Escape; the remove call must pass the same flag.
+  // Capture phase so page handlers cannot swallow Escape. Removal needs the
+  // same flag.
   environment.window.addEventListener('keydown', handleWindowKeydown, true)
 
   checkout.removeListeners = () => {
@@ -160,9 +160,8 @@ function handleMessage(checkout: ActiveCheckout, event: MessageEvent): void {
     return
   }
 
-  // Any verified embed message proves the embed has loaded, even if it
-  // arrives before (or without) invoq:ready, so the ready timeout never
-  // tears down a live checkout.
+  // Any verified message proves the embed loaded, even one arriving before or
+  // without invoq:ready, so the timeout never tears down a live checkout.
   markReady(checkout)
 
   switch (message.type) {
@@ -194,9 +193,8 @@ function markReady(checkout: ActiveCheckout): void {
 
   checkout.ready = true
   checkout.window.clearTimeout(checkout.readyTimeoutId)
-  // aria-modal is only asserted once the embed's own focus trap is live;
-  // claiming modality during the loading phase strands AT users on hidden
-  // but still-tabbable background content.
+  // aria-modal waits for the embed's own focus trap: claiming modality while
+  // loading strands AT users on hidden but still-tabbable page content.
   checkout.host.host.setAttribute('aria-modal', 'true')
   checkout.host.spinner.hidden = true
 

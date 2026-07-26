@@ -61,6 +61,7 @@ Both packages are written in TypeScript and ship type definitions. `@invoq/serve
 1. Sign in to the [invoq dashboard](https://app.invoq.money) and create a project.
 2. On the **API keys** page, create a secret key. Test keys start with `sk_test_`, live keys with `sk_live_`. The key mode determines whether invoices are test or live.
 3. In your project's **webhooks** settings, save your webhook URL. The webhook secret (`whsec_...`) for that mode is shown once, when you first enable the webhook — store it right away. Webhook URLs must be public HTTPS URLs.
+4. Set up your **Receiving wallet** before going live. Test invoices don't need one; a live invoice with nowhere to settle fails with `409 no_payment_options_available`.
 
 Add both to your server environment:
 
@@ -89,7 +90,6 @@ const invoq = new Invoq(process.env.INVOQ_SECRET_KEY!)
 export async function POST() {
   const invoice = await invoq.invoices.create({
     amount: '129',
-    currency: 'USD',
     description: 'SaaS boilerplate',
     reference_id: 'order_1234',
   })
@@ -102,7 +102,7 @@ Notes:
 
 - The server examples are Web Fetch API route handlers (Next.js App Router, Hono, and similar). In Express, send the response with `res.json({ invoiceId: invoice.id })` instead.
 - Use a server-side amount. Do not trust client-supplied amounts.
-- `amount` is a decimal USD string from `'0.01'` to `'1000000.00'` with up to 2 decimal places, such as `'129'` or `'129.99'`.
+- `amount` is a decimal USD string from `'0.01'` to `'1000000.00'` with up to 2 decimal places, such as `'129'` or `'129.99'`. Currency is always USD, and test or live comes from the key — neither is a request field.
 - Use `reference_id` to map `invoice.paid` webhooks back to your order. It also makes creation retry-safe: creating again with the same `reference_id` and the same invoice terms returns the existing invoice instead of a duplicate, while different terms fail with a `409 reference_id_conflict` API error.
 
 In your frontend, call your server endpoint first, then pass the returned `invoiceId` to checkout:
@@ -156,7 +156,9 @@ export async function POST(request: Request) {
 }
 ```
 
-Use `invoice.paid` webhooks to fulfill orders on your server. When `isInvoicePaid(event)` is true, the invoice is ready for automatic fulfillment; use the invoice `reference_id` to find and fulfill your order. A `review_required` invoice does not emit an `invoice.paid` webhook yet; if checkout reports `review_required`, show a pending-review state and wait for a later `invoice.paid` webhook after review is approved.
+Use `invoice.paid` webhooks to fulfill orders on your server. When `isInvoicePaid(event)` is true, the invoice is ready for automatic fulfillment; use its `reference_id` to find your order. A `review_required` invoice emits no `invoice.paid` until the review clears.
+
+invoq also sends `invoice.payment_reversed` when a previously paid invoice drops back below its amount — a chain reorg dropping a confirmed transfer, for example. Catch it with `isInvoicePaymentReversed(event)` and hold or reverse the fulfillment according to your own policy.
 
 Browser `paid`, `overpaid`, and `review_required` results are UX signals only. Do not fulfill orders from browser results. In production, add your own loading state and error handling around this flow.
 
@@ -178,7 +180,7 @@ console.log(paid.status) // 'paid'
 
 `createTestPayment` only works on invoices created with a `sk_test_` key. When the payments reach the invoice amount, the invoice becomes `paid` and invoq sends a real signed `invoice.paid` webhook to your test webhook URL, so it exercises your whole fulfillment path. Partial amounts are allowed and produce `partially_paid`.
 
-To receive webhooks on your machine, expose your local server with an HTTPS tunnel such as ngrok or cloudflared and save the tunnel URL as your test webhook URL in the dashboard. The dashboard can also send a signed `webhook.ping` to check connectivity.
+To receive webhooks on your machine, expose your local server with an HTTPS tunnel such as ngrok or cloudflared and save the tunnel URL as your test webhook URL in the dashboard.
 
 ## Webhooks in production
 
@@ -213,9 +215,9 @@ app.post(
 )
 ```
 
-**Fulfill idempotently.** Failed deliveries are retried (up to 5 attempts over a few hours, with increasing backoff), so your endpoint can receive the same event more than once. Track fulfilled orders by `reference_id` or invoice `id` and make repeat deliveries a no-op.
+**Fulfill idempotently.** Failed deliveries are retried (up to 5 attempts, backing off 1 minute, 5 minutes, 30 minutes, then 2 hours), so your endpoint can receive the same event more than once. Track fulfilled orders by `reference_id` or invoice `id` and make repeat deliveries a no-op. Deliveries can also arrive out of order — keep the snapshot with the highest `payment_revision`.
 
-**Respond with a 2xx quickly.** Any other status counts as a failed delivery. Transient failures (timeouts, `429`, `5xx`) are retried; other `4xx` responses are not.
+**Respond with a 2xx quickly.** Any other status counts as a failed delivery and is retried, including redirects and `4xx`, so a deploy window or a temporarily misrouted path is retried rather than dropped.
 
 `verifyWebhook` throws `InvoqSignatureVerificationError` when the signature is missing, invalid, or the timestamp is more than 5 minutes off — respond with a 400. The signature header is `invoq-signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<raw body>">`, so you can verify it in any language.
 
@@ -230,14 +232,17 @@ const invoq = new Invoq(apiKey, {
 })
 ```
 
-- `invoq.invoices.create(input)` — creates an invoice. `input`: `amount` (required), `currency` (`'USD'`, default), `description`, `reference_id`, `return_url`.
+- `invoq.invoices.create(input)` — creates an invoice. `input`: `amount` (required), `description`, `reference_id`, `return_url`.
 - `invoq.invoices.get(invoiceId)` — fetches a public invoice.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — simulates payment on a test invoice.
 
-`invoices.get()` returns the public invoice shape from the hosted checkout endpoint. It includes checkout-facing fields such as `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers`, and `direct_onchain_rails`, but does not include `reference_id`. Use the create response or the `invoice.paid` webhook when you need your merchant `reference_id`.
+`invoices.get()` returns the public invoice shape from the hosted checkout endpoint: the create shape plus `amount_paid`, `project`, and `transfers`, minus `reference_id`. Use the create response or the `invoice.paid` webhook when you need your merchant `reference_id`.
 
-Amounts in responses are normalized to 4 decimal places: create with `'129'` and the invoice returns `amount: '129.0000'`. Compare amounts numerically, not as strings.
-`amount_due` is derived as `max(amount - amount_paid, 0)` and uses the same 18-decimal scale as `amount_paid`; `amount_overpaid` is its mirror, `max(amount_paid - amount, 0)`, so you never subtract money yourself. `monitoring_status` is `'active'` or `'ended'` — once it is `'ended'`, the deposit address is no longer watched — and `transfers` is the confirmed on-chain receipt trail (each entry has `tx_hash`, `amount`, and `explorer_tx_url`). Both are `null` / `[]` for test invoices.
+Two status fields. `status` is the accounting one — `unpaid`, `partially_paid`, `paid`, `settling`, `settled`, `review_required` — where the three paid-like values differ only in how far the funds have moved to your wallet. `checkout_status` is payer-facing — `open`, `confirming`, `expired`, `paid`, `unavailable` — and never authorizes fulfillment. `payment_revision` increments whenever the confirmed payment set changes, so you can discard a snapshot older than one you already hold.
+
+Amounts in responses are normalized to 4 decimal places: create with `'129'` and the invoice returns `amount: '129.0000'`. Compare amounts numerically, not as strings. `amount_due` is derived as `max(amount - amount_paid, 0)` and uses the same 18-decimal scale as `amount_paid`; `amount_overpaid` is its mirror, `max(amount_paid - amount, 0)`, so you never subtract money yourself.
+
+`payment_options` holds the payment instructions, fixed at creation and `[]` in test mode. Entries are discriminated by `status`, then `collection_method`: only `'ready'` is payable, `'evm_deposit'` carries `deposit_address` and `suggested_amount`, `'direct_exact'` carries `recipient_address` and an `exact_amount` the buyer must send to the digit. `transfers` is the confirmed receipt trail — `transaction_id`, `event_index`, `amount`, `explorer_transaction_url` — and stays `[]` until a payment confirms. Full field reference: [REST API docs](https://github.com/invoqmoney/api).
 
 When they fail, all methods reject with:
 
@@ -246,13 +251,14 @@ When they fail, all methods reject with:
 
 Requests time out after 10 seconds by default (`timeoutMs`). A timed-out `create` is safe to retry with the same `reference_id` — you get the existing invoice back, never a duplicate.
 
-`verifyWebhook(rawBody, headers, secret)` accepts the raw body as a string, `Uint8Array`, or Node `Buffer`, and headers as a Fetch `Headers` object or a plain Node header object. It returns the parsed event or throws `InvoqSignatureVerificationError`. Use `isInvoicePaid(event)` for fulfillable `invoice.paid` events; it accepts paid-equivalent invoice statuses (`paid`, `settling`, or `settled`) and rejects `review_required`.
+`verifyWebhook(rawBody, headers, secret)` accepts the raw body as a string, `Uint8Array`, or Node `Buffer`, and headers as a Fetch `Headers` object or a plain Node header object. It returns the parsed event or throws `InvoqSignatureVerificationError`. Use `isInvoicePaid(event)` for fulfillable `invoice.paid` events; it accepts paid-equivalent invoice statuses (`paid`, `settling`, or `settled`) and rejects `review_required`. Use `isInvoicePaymentReversed(event)` for `invoice.payment_reversed`. Both narrow the event type; an event type this SDK version does not model still verifies and is returned as-is.
 
 ### `@invoq/checkout`
 
 ```ts
 const checkout = openCheckout(invoiceId, {
   checkoutOrigin: 'https://embed.invoq.money', // optional override
+  locale: undefined, // optional UI language, default: the payer's browser
   styleNonce: undefined, // optional CSP nonce for the injected <style>
   signal: undefined, // optional AbortSignal that closes the modal
 })
@@ -265,11 +271,13 @@ const result = await checkout.result
 `result` always resolves (it never rejects) with one of:
 
 - `{ status: 'paid' | 'overpaid', invoiceId, mode }` — payment confirmed. The modal stays open showing the embed's success screen until the customer dismisses it; call `checkout.close()` first if you navigate away immediately.
-- `{ status: 'review_required', invoiceId, mode }` — payment was received but needs manual review. Show a pending-review state; do not fulfill from the browser result.
+- `{ status: 'review_required', invoiceId, mode }` — payment received but held for manual review. Show a pending state.
 - `{ status: 'closed', invoiceId, reason }` — closed without payment. `reason` is `'user'` (close button or Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (another `openCheckout` call), or `'aborted'` (the `signal` fired).
 - `{ status: 'failed', invoiceId }` — the checkout did not load within 15 seconds.
 
-On the payment results, `mode` is `'test'` or `'live'` — a hint so you can distinguish a simulated test payment from real money in the browser. It is advisory only: always confirm fulfillment on your server with the `invoice.paid` webhook.
+On the payment results, `mode` is `'test'` or `'live'`, so you can tell a simulated payment from real money in the browser — advisory only, fulfill on the webhook.
+
+`locale` takes a BCP 47 tag (`'fr'`, `'pt-BR'`, `'zh-Hant'`, …). The checkout speaks ten languages and maps the tag onto the closest one, so a region it does not carry is never an error.
 
 `openCheckout` itself throws on invalid input (`invoiceId` must start with `inv_`) and in browsers without Shadow DOM support. Only one checkout is open at a time; opening another closes the previous one with `reason: 'replaced'`.
 

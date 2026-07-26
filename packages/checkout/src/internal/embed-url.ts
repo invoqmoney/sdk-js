@@ -3,6 +3,7 @@ const DEFAULT_CHECKOUT_ORIGIN = 'https://embed.invoq.money'
 type EmbedUrlOptions = {
   invoiceId: string
   checkoutOrigin?: string
+  locale?: string
 }
 
 export function buildEmbedUrl(
@@ -19,6 +20,10 @@ export function buildEmbedUrl(
   embedUrl.searchParams.set('embedded', '1')
   embedUrl.searchParams.set('origin', hostOrigin)
   embedUrl.searchParams.set('channel', channel)
+
+  if (options.locale !== undefined) {
+    embedUrl.searchParams.set('locale', validateLocale(options.locale))
+  }
 
   return {
     iframeUrl: embedUrl.toString(),
@@ -59,4 +64,14 @@ function validateInvoiceId(invoiceId: string): void {
   if (!invoiceId.startsWith('inv_')) {
     throw new Error('invoiceId must start with inv_.')
   }
+}
+
+// Tags are passed through: the checkout maps them onto the language it has and
+// falls back to the payer's browser languages, so this never rejects a region.
+function validateLocale(locale: string): string {
+  if (typeof locale !== 'string' || locale.trim() === '') {
+    throw new Error('locale must be a non-empty string.')
+  }
+
+  return locale
 }

@@ -50,9 +50,7 @@ export function parseEmbedMessage(
       return {
         type: 'invoq:state',
         state: typeof message.state === 'string' ? message.state : '',
-        // `mode` rides every state event so a host can tell a simulated test
-        // payment from real money. Anything that isn't 'test' degrades to
-        // 'live' — the safe direction: never label real money as a test.
+        // Anything but 'test' degrades to 'live': never label real money a test.
         mode: message.mode === 'test' ? 'test' : 'live',
       }
     default:

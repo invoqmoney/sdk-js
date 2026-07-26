@@ -63,6 +63,7 @@ Les deux paquets sont écrits en TypeScript et livrés avec leurs définitions d
 1. Connectez-vous au [tableau de bord invoq](https://app.invoq.money) et créez un projet.
 2. Sur la page **API keys**, créez une clé secrète. Les clés de test commencent par `sk_test_`, les clés de production par `sk_live_`. Le mode de la clé détermine si les factures sont de test ou de production.
 3. Dans les réglages **webhooks** de votre projet, enregistrez votre URL de webhook. Le secret du webhook (`whsec_...`) pour ce mode ne s’affiche qu’une seule fois, à la première activation du webhook — notez-le tout de suite. L’URL du webhook doit être une URL HTTPS publique.
+4. Configurez votre **Receiving wallet** avant de passer en production. Les factures de test n’en ont pas besoin ; une facture de production sans destination de règlement échoue avec `409 no_payment_options_available`.
 
 Ajoutez les deux à l’environnement de votre serveur :
 
@@ -91,7 +92,6 @@ const invoq = new Invoq(process.env.INVOQ_SECRET_KEY!)
 export async function POST() {
   const invoice = await invoq.invoices.create({
     amount: '129',
-    currency: 'USD',
     description: 'SaaS boilerplate',
     reference_id: 'order_1234',
   })
@@ -104,7 +104,7 @@ Notes :
 
 - Les exemples serveur utilisent des gestionnaires de route basés sur la Web Fetch API (Next.js App Router, Hono et similaires). Avec Express, renvoyez la réponse avec `res.json({ invoiceId: invoice.id })`.
 - Définissez le montant côté serveur. Ne faites pas confiance aux montants envoyés par le client.
-- `amount` est une chaîne décimale en USD de `'0.01'` à `'1000000.00'`, avec au plus 2 décimales, comme `'129'` ou `'129.99'`.
+- `amount` est une chaîne décimale en USD de `'0.01'` à `'1000000.00'`, avec au plus 2 décimales, comme `'129'` ou `'129.99'`. La devise est toujours l’USD, et le mode test ou live vient de la clé : ni l’un ni l’autre n’est un champ de la requête.
 - Utilisez `reference_id` pour relier les webhooks `invoice.paid` à votre commande. Il permet aussi de relancer la création sans risque : si vous recréez avec le même `reference_id` et les mêmes conditions, vous récupérez la facture existante au lieu d’un doublon ; avec des conditions différentes, l’appel échoue avec une erreur d’API `409 reference_id_conflict`.
 
 Côté frontend, appelez d’abord votre route serveur, puis passez l’`invoiceId` renvoyé à la page de paiement :
@@ -158,7 +158,9 @@ export async function POST(request: Request) {
 }
 ```
 
-Traitez les commandes à partir des webhooks `invoice.paid` reçus côté serveur. Quand `isInvoicePaid(event)` est vrai, la facture peut être traitée automatiquement ; utilisez son `reference_id` pour retrouver et traiter votre commande. Une facture `review_required` n’émet pas encore de webhook `invoice.paid` ; si le checkout renvoie `review_required`, affichez un état en attente de vérification et attendez un webhook `invoice.paid` ultérieur après validation.
+Traitez les commandes à partir des webhooks `invoice.paid` reçus côté serveur. Quand `isInvoicePaid(event)` est vrai, la facture peut être traitée automatiquement ; utilisez son `reference_id` pour retrouver votre commande. Une facture `review_required` n’émet aucun `invoice.paid` tant que la vérification n’est pas levée.
+
+invoq envoie aussi `invoice.payment_reversed` quand une facture déjà payée repasse sous son montant — par exemple lorsqu’une réorganisation de chaîne annule un transfert confirmé. Interceptez-le avec `isInvoicePaymentReversed(event)`, puis suspendez ou annulez le traitement selon votre propre politique.
 
 Les résultats `paid`, `overpaid` et `review_required` du navigateur ne sont que des indications pour l’interface. Ne traitez jamais une commande à partir d’un résultat navigateur. En production, ajoutez votre propre état de chargement et votre gestion d’erreurs autour de ce flux.
 
@@ -180,7 +182,7 @@ console.log(paid.status) // 'paid'
 
 `createTestPayment` ne fonctionne que sur les factures créées avec une clé `sk_test_`. Quand les paiements atteignent le montant de la facture, celle-ci passe à `paid` et invoq envoie un vrai webhook `invoice.paid` signé à votre URL de webhook de test — tout votre flux de traitement est donc testé. Les montants partiels sont autorisés et produisent `partially_paid`.
 
-Pour recevoir des webhooks sur votre machine, exposez votre serveur local via un tunnel HTTPS comme ngrok ou cloudflared, et enregistrez l’URL du tunnel comme URL de webhook de test dans le tableau de bord. Le tableau de bord peut aussi envoyer un `webhook.ping` signé pour vérifier la connectivité.
+Pour recevoir des webhooks sur votre machine, exposez votre serveur local via un tunnel HTTPS comme ngrok ou cloudflared, et enregistrez l’URL du tunnel comme URL de webhook de test dans le tableau de bord.
 
 ## Les webhooks en production
 
@@ -215,9 +217,9 @@ app.post(
 )
 ```
 
-**Traitez les événements de façon idempotente.** Les livraisons échouées sont retentées (jusqu’à 5 tentatives sur quelques heures, avec un délai croissant entre les tentatives) ; votre route peut donc recevoir le même événement plusieurs fois. Suivez les commandes déjà traitées par `reference_id` ou par `id` de facture, et ignorez les livraisons répétées.
+**Traitez les événements de façon idempotente.** Les livraisons échouées sont retentées (jusqu’à 5 tentatives, avec des délais de 1 minute, 5 minutes, 30 minutes, puis 2 heures) ; votre route peut donc recevoir le même événement plusieurs fois. Suivez les commandes déjà traitées par `reference_id` ou par `id` de facture, et ignorez les livraisons répétées. Elles peuvent aussi arriver dans le désordre : gardez l’instantané dont le `payment_revision` est le plus élevé.
 
-**Répondez vite avec un 2xx.** Tout autre statut compte comme une livraison échouée : les délais dépassés, `429` et `5xx` sont retentés, les autres `4xx` ne le sont pas.
+**Répondez vite avec un 2xx.** Tout autre statut compte comme une livraison échouée et est retenté, y compris les redirections et les `4xx` : une fenêtre de déploiement ou une route temporairement mal aiguillée est donc retentée, pas abandonnée.
 
 `verifyWebhook` lève `InvoqSignatureVerificationError` quand la signature est absente, invalide, ou que l’horodatage est décalé de plus de 5 minutes — répondez alors par un 400. L’en-tête de signature est `invoq-signature: t=<secondes unix>,v1=<HMAC-SHA256 hexadécimal de "<t>.<corps brut>">`, vous pouvez donc le vérifier dans n’importe quel langage.
 
@@ -232,14 +234,17 @@ const invoq = new Invoq(apiKey, {
 })
 ```
 
-- `invoq.invoices.create(input)` — crée une facture. `input` : `amount` (requis), `currency` (`'USD'`, défaut), `description`, `reference_id`, `return_url`.
+- `invoq.invoices.create(input)` — crée une facture. `input` : `amount` (requis), `description`, `reference_id`, `return_url`.
 - `invoq.invoices.get(invoiceId)` — récupère une facture publique.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — simule un paiement sur une facture de test.
 
-`invoices.get()` renvoie la forme de facture publique utilisée par la page de checkout hébergée. Elle inclut les champs côté checkout, comme `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers` et `direct_onchain_rails`, mais n’inclut pas `reference_id`. Utilisez la réponse de création ou le webhook `invoice.paid` quand vous avez besoin de votre `reference_id` marchand.
+`invoices.get()` renvoie la forme de facture publique utilisée par la page de checkout hébergée : la forme de la réponse de création, plus `amount_paid`, `project` et `transfers`, moins `reference_id`. Utilisez la réponse de création ou le webhook `invoice.paid` quand vous avez besoin de votre `reference_id` marchand.
 
-Les montants des réponses sont normalisés à 4 décimales : créez avec `'129'` et la facture renvoie `amount: '129.0000'`. Comparez les montants numériquement, pas comme des chaînes.
-`amount_due` est dérivé sous la forme `max(amount - amount_paid, 0)` et utilise la même échelle à 18 décimales que `amount_paid` ; `amount_overpaid` en est le miroir, `max(amount_paid - amount, 0)`, si bien que vous n’avez jamais à soustraire d’argent vous-même. `monitoring_status` vaut `'active'` ou `'ended'` — une fois à `'ended'`, l’adresse de dépôt n’est plus surveillée — et `transfers` est le journal confirmé des encaissements on-chain (chaque entrée a `tx_hash`, `amount` et `explorer_tx_url`). Les deux valent `null` / `[]` pour les factures de test.
+Deux champs de statut. `status` est le statut comptable — `unpaid`, `partially_paid`, `paid`, `settling`, `settled`, `review_required` — et les trois valeurs assimilables à un paiement validé ne diffèrent que par l’avancement des fonds vers votre portefeuille. `checkout_status` est celui vu par le payeur — `open`, `confirming`, `expired`, `paid`, `unavailable` — et n’autorise jamais le traitement d’une commande. `payment_revision` augmente à chaque changement de l’ensemble des paiements confirmés, ce qui permet d’écarter un instantané plus ancien que celui que vous avez déjà.
+
+Les montants des réponses sont normalisés à 4 décimales : créez avec `'129'` et la facture renvoie `amount: '129.0000'`. Comparez les montants numériquement, pas comme des chaînes. `amount_due` est dérivé sous la forme `max(amount - amount_paid, 0)` et utilise la même échelle à 18 décimales que `amount_paid` ; `amount_overpaid` en est le miroir, `max(amount_paid - amount, 0)`, si bien que vous n’avez jamais à soustraire d’argent vous-même.
+
+`payment_options` contient les instructions de paiement, figées à la création et `[]` en mode test. Les entrées se distinguent par `status`, puis par `collection_method` : seule `'ready'` est payable, `'evm_deposit'` porte `deposit_address` et `suggested_amount`, `'direct_exact'` porte `recipient_address` et un `exact_amount` que l’acheteur doit envoyer au chiffre près. `transfers` est le journal confirmé des encaissements — `transaction_id`, `event_index`, `amount`, `explorer_transaction_url` — et reste `[]` tant qu’aucun paiement n’est confirmé. Référence complète des champs : [documentation de l’API REST](https://github.com/invoqmoney/api).
 
 En cas d’échec, les méthodes renvoient une `Promise` rejetée avec :
 
@@ -248,13 +253,14 @@ En cas d’échec, les méthodes renvoient une `Promise` rejetée avec :
 
 Les requêtes expirent au bout de 10 secondes par défaut (`timeoutMs`). Un `create` expiré peut être réessayé sans risque avec le même `reference_id` — vous récupérez la facture existante, jamais un doublon.
 
-`verifyWebhook(rawBody, headers, secret)` accepte le corps brut sous forme de chaîne, de `Uint8Array` ou de `Buffer` Node, et les en-têtes sous forme d’objet `Headers` Fetch ou d’objet d’en-têtes Node classique. Il renvoie l’événement analysé ou lève `InvoqSignatureVerificationError`. Utilisez `isInvoicePaid(event)` pour les événements `invoice.paid` permettant de traiter une commande ; il accepte les statuts de facture assimilables à un paiement validé (`paid`, `settling` ou `settled`) et rejette `review_required`.
+`verifyWebhook(rawBody, headers, secret)` accepte le corps brut sous forme de chaîne, de `Uint8Array` ou de `Buffer` Node, et les en-têtes sous forme d’objet `Headers` Fetch ou d’objet d’en-têtes Node classique. Il renvoie l’événement analysé ou lève `InvoqSignatureVerificationError`. Utilisez `isInvoicePaid(event)` pour les événements `invoice.paid` permettant de traiter une commande ; il accepte les statuts de facture assimilables à un paiement validé (`paid`, `settling` ou `settled`) et rejette `review_required`. Utilisez `isInvoicePaymentReversed(event)` pour `invoice.payment_reversed`. Les deux affinent le type de l’événement ; un type d’événement que cette version du SDK ne modélise pas encore est tout de même vérifié et renvoyé tel quel.
 
 ### `@invoq/checkout`
 
 ```ts
 const checkout = openCheckout(invoiceId, {
   checkoutOrigin: 'https://embed.invoq.money', // optionnel, remplace le défaut
+  locale: undefined, // optionnel, langue de l’interface, par défaut celle du navigateur
   styleNonce: undefined, // optionnel, nonce CSP pour le <style> injecté
   signal: undefined, // optionnel, AbortSignal qui ferme la fenêtre
 })
@@ -267,11 +273,13 @@ const result = await checkout.result
 `result` se résout toujours (il ne rejette jamais) avec l’un de ces objets :
 
 - `{ status: 'paid' | 'overpaid', invoiceId, mode }` — paiement confirmé. La fenêtre reste ouverte sur l’écran de succès intégré jusqu’à ce que le client la ferme ; appelez d’abord `checkout.close()` si vous naviguez immédiatement.
-- `{ status: 'review_required', invoiceId, mode }` — paiement reçu, mais vérification manuelle requise. Affichez un état en attente de vérification ; ne traitez pas la commande à partir du résultat navigateur.
+- `{ status: 'review_required', invoiceId, mode }` — paiement reçu, mais retenu pour vérification manuelle. Affichez un état en attente.
 - `{ status: 'closed', invoiceId, reason }` — fermée sans paiement. `reason` vaut `'user'` (bouton de fermeture ou Échap), `'programmatic'` (`checkout.close()`), `'replaced'` (un autre appel à `openCheckout`) ou `'aborted'` (le `signal` s’est déclenché).
 - `{ status: 'failed', invoiceId }` — la page de paiement n’a pas chargé sous 15 secondes.
 
-Dans les résultats de paiement, `mode` vaut `'test'` ou `'live'` — un indice pour distinguer, dans le navigateur, un paiement de test simulé de l’argent réel. C’est purement indicatif : confirmez toujours le traitement de la commande sur votre serveur avec le webhook `invoice.paid`.
+Dans les résultats de paiement, `mode` vaut `'test'` ou `'live'`, ce qui distingue dans le navigateur un paiement simulé de l’argent réel — purement indicatif, traitez la commande via le webhook.
+
+`locale` accepte une étiquette BCP 47 (`'fr'`, `'pt-BR'`, `'zh-Hant'`, …). La page de paiement parle dix langues et rapproche l’étiquette de la plus proche : une région absente n’est jamais une erreur.
 
 `openCheckout` lui-même lève une erreur sur entrée invalide (`invoiceId` doit commencer par `inv_`) et dans les navigateurs sans Shadow DOM. Une seule page de paiement est ouverte à la fois ; en ouvrir une autre ferme la précédente avec `reason: 'replaced'`.
 

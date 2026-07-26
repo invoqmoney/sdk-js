@@ -5,15 +5,17 @@ export class InvoqError extends Error {
   }
 }
 
+type ApiErrorField = {
+  field: string
+  location: 'query' | 'path' | 'body' | 'header'
+  code: string
+  message: string
+}
+
 export class InvoqApiError extends InvoqError {
   readonly status: number
   readonly code?: string
-  readonly fields?: Array<{
-    field: string
-    location: 'query' | 'path' | 'body' | 'header'
-    code: string
-    message: string
-  }>
+  readonly fields?: ApiErrorField[]
   readonly meta?: Record<string, unknown>
   readonly payload?: unknown
 
@@ -22,12 +24,7 @@ export class InvoqApiError extends InvoqError {
     options: {
       status: number
       code?: string
-      fields?: Array<{
-        field: string
-        location: 'query' | 'path' | 'body' | 'header'
-        code: string
-        message: string
-      }>
+      fields?: ApiErrorField[]
       meta?: Record<string, unknown>
       payload?: unknown
     },

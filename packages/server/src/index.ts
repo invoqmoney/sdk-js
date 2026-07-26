@@ -4,24 +4,32 @@ export {
   InvoqError,
   InvoqSignatureVerificationError,
 } from './errors'
-export { isInvoicePaid, verifyWebhook } from './webhooks'
+export {
+  isInvoicePaid,
+  isInvoicePaymentReversed,
+  verifyWebhook,
+} from './webhooks'
 export type {
+  ChainNamespace,
+  CheckoutStatus,
   CreateInvoiceInput,
   CreateTestPaymentInput,
-  DirectOnchainRail,
   Invoice,
   InvoiceCurrency,
   InvoiceMode,
-  InvoqWebhookEvent,
   InvoicePaidEvent,
   InvoicePaidStatus,
-  InvoicePaymentStatus,
+  InvoicePaymentReversedEvent,
   InvoiceStatus,
-  MonitoringStatus,
+  InvoqWebhookEvent,
+  PaymentOption,
+  PaymentOptionCollectionMethod,
+  PaymentOptionStatus,
   PublicInvoice,
   PublicInvoiceProject,
   PublicInvoiceTransfer,
   TestPaymentInvoice,
+  WebhookEventType,
   WebhookRawBody,
 } from './types'
 export type { WebhookHeaders } from './webhooks'

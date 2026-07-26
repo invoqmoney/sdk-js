@@ -21,6 +21,8 @@ export function constantTimeEqual(left: string, right: string): boolean {
   const leftBytes = Buffer.from(left)
   const rightBytes = Buffer.from(right)
 
+  // The mismatched-length branch still compares, so a wrong-length signature
+  // costs the same time as a wrong-value one. Do not short-circuit it.
   if (leftBytes.length !== rightBytes.length) {
     const maxLength = Math.max(leftBytes.length, rightBytes.length, 1)
     const paddedLeft = Buffer.alloc(maxLength)

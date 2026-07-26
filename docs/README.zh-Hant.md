@@ -63,6 +63,7 @@ npm install @invoq/checkout
 1. 登入 [invoq 商家後台](https://app.invoq.money)，建立一個專案。
 2. 在 **API keys** 頁面建立一組私密金鑰（secret key）。測試金鑰以 `sk_test_` 開頭，正式金鑰以 `sk_live_` 開頭；用哪種金鑰，決定開出的帳單是測試單還是正式單。
 3. 在專案的 **webhooks** 設定裡儲存你的 webhook URL。對應模式的 webhook 簽章金鑰（`whsec_...`）只在首次啟用 webhook 時顯示一次——記得馬上存好。webhook URL 必須是可公開存取的 HTTPS 網址。
+4. 上線前先設定 **Receiving wallet**。測試帳單不需要它；沒有結算去向的正式帳單會以 `409 no_payment_options_available` 失敗。
 
 把兩者都加進伺服器的環境變數：
 
@@ -91,7 +92,6 @@ const invoq = new Invoq(process.env.INVOQ_SECRET_KEY!)
 export async function POST() {
   const invoice = await invoq.invoices.create({
     amount: '129',
-    currency: 'USD',
     description: 'SaaS boilerplate',
     reference_id: 'order_1234',
   })
@@ -104,7 +104,7 @@ export async function POST() {
 
 - 伺服器端範例是 Web Fetch API 的路由處理函式（Next.js App Router、Hono 等都適用）。用 Express 的話，改成以 `res.json({ invoiceId: invoice.id })` 回應即可。
 - 金額要由伺服器端決定，不要相信用戶端傳來的金額。
-- `amount` 是 `'0.01'` 到 `'1000000.00'` 之間的十進位美元字串，最多兩位小數，例如 `'129'` 或 `'129.99'`。
+- `amount` 是 `'0.01'` 到 `'1000000.00'` 之間的十進位美元字串，最多兩位小數，例如 `'129'` 或 `'129.99'`。 幣別恆為 USD，測試還是正式由金鑰決定——兩者都不是請求欄位。
 - 用 `reference_id` 把 `invoice.paid` webhook 對應回你的訂單。它也讓建立動作可以放心重試：用相同的 `reference_id` 和相同的帳單條件再建立一次，回傳的是既有帳單而不是重複開單；條件不同則會回 `409 reference_id_conflict` API 錯誤。
 
 前端先呼叫你自己的伺服器端點，再把回傳的 `invoiceId` 交給結帳頁：
@@ -158,7 +158,9 @@ export async function POST(request: Request) {
 }
 ```
 
-訂單處理以伺服器端收到的 `invoice.paid` webhook 為準。`isInvoicePaid(event)` 為 true 時，表示帳單可以自動履約；用帳單裡的 `reference_id` 找到並處理對應的訂單。`review_required` 帳單暫時不會發送 `invoice.paid` webhook；如果結帳回傳 `review_required`，請顯示待審核狀態，並等審核通過後的 `invoice.paid` webhook 再履約。
+訂單處理以伺服器端收到的 `invoice.paid` webhook 為準。`isInvoicePaid(event)` 為 true 時，表示帳單可以自動履約；用它的 `reference_id` 找到對應的訂單。`review_required` 帳單在審核通過前不會發出任何 `invoice.paid`。
+
+帳單從已付款跌回不足額時，invoq 還會發 `invoice.payment_reversed`——例如鏈重組把一筆已確認的轉帳拿掉了。用 `isInvoicePaymentReversed(event)` 接住它，再依你自己的策略暫停或撤銷履約。
 
 瀏覽器端的 `paid` / `overpaid` / `review_required` 結果只是給使用者介面用的提示，不要憑瀏覽器結果處理訂單。正式環境請圍繞這套流程加上你自己的載入狀態和錯誤處理。
 
@@ -180,7 +182,7 @@ console.log(paid.status) // 'paid'
 
 `createTestPayment` 只對 `sk_test_` 金鑰建立的帳單有效。累計付款達到帳單金額時，帳單變為 `paid`，invoq 會向你的測試 webhook URL 送出一條真實簽章的 `invoice.paid` webhook——整條訂單處理流程都能測到。也可以只付部分金額，帳單會變成 `partially_paid`。
 
-要在本機收 webhook，用 ngrok、cloudflared 之類的 HTTPS 隧道把本地伺服器公開出去，再把隧道網址存成商家後台裡的測試 webhook URL。後台也能送出一條帶簽章的 `webhook.ping`，幫你確認連線。
+要在本機收 webhook，用 ngrok、cloudflared 之類的 HTTPS 隧道把本地伺服器公開出去，再把隧道網址存成商家後台裡的測試 webhook URL。
 
 ## 正式環境中的 webhook
 
@@ -215,9 +217,9 @@ app.post(
 )
 ```
 
-**處理訂單要冪等。** 投遞失敗會重試（最多 5 次，退避遞增，共跨約數小時），所以同一事件可能送達不止一次。按 `reference_id` 或帳單 `id` 記錄已處理的訂單，重複送達就直接略過。
+**處理訂單要冪等。** 投遞失敗會重試（最多 5 次，間隔依序為 1 分鐘、5 分鐘、30 分鐘、2 小時），所以同一事件可能送達不止一次。按 `reference_id` 或帳單 `id` 記錄已處理的訂單，重複送達就直接略過。送達順序也不保證——請保留 `payment_revision` 最大的那份快照。
 
-**盡快回 2xx。** 任何其他狀態碼都算投遞失敗：逾時、`429`、`5xx` 會重試，其他 `4xx` 則不會。
+**盡快回 2xx。** 任何其他狀態碼都算投遞失敗並會重試，重新導向和 `4xx` 也在其中，所以一次發版視窗或暫時走錯的路由會被重試，而不是直接丟棄。
 
 簽章缺失、無效，或時間戳偏差超過 5 分鐘時，`verifyWebhook` 會擲出 `InvoqSignatureVerificationError`——這時回 400 即可。簽章標頭格式是 `invoq-signature: t=<unix 秒>,v1=<對 "<t>.<原始請求內容>" 計算的 HMAC-SHA256 十六進位值>`，所以用任何語言都能自行驗證。
 
@@ -232,14 +234,17 @@ const invoq = new Invoq(apiKey, {
 })
 ```
 
-- `invoq.invoices.create(input)` —— 建立帳單。`input`：`amount`（必填）、`currency`（`'USD'`，預設）、`description`、`reference_id`、`return_url`。
+- `invoq.invoices.create(input)` —— 建立帳單。`input`：`amount`（必填）、`description`、`reference_id`、`return_url`。
 - `invoq.invoices.get(invoiceId)` —— 查詢公開帳單。
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` —— 在測試帳單上模擬付款。
 
-`invoices.get()` 回傳託管結帳頁使用的公開帳單結構。它包含面向結帳頁的欄位，例如 `amount_paid`、`amount_due`、`amount_overpaid`、`payment_status`、`project`、`deposit_address`、`monitoring_ends_at`、`monitoring_status`、`transfers` 和 `direct_onchain_rails`，但不包含 `reference_id`。如果需要商家端的 `reference_id`，請使用建立帳單的回應或 `invoice.paid` webhook。
+`invoices.get()` 回傳託管結帳頁使用的公開帳單結構：即建立回應的結構，加上 `amount_paid`、`project` 和 `transfers`，去掉 `reference_id`。如果需要商家端的 `reference_id`，請使用建立帳單的回應或 `invoice.paid` webhook。
 
-回應裡的金額一律格式化為 4 位小數：用 `'129'` 建立，帳單會回傳 `amount: '129.0000'`。比較金額請按數值比，不要按字串比。
-`amount_due` 依 `max(amount - amount_paid, 0)` 衍生，使用和 `amount_paid` 相同的 18 位小數 scale；`amount_overpaid` 與它互為鏡像，即 `max(amount_paid - amount, 0)`，所以你不必自己做減法。`monitoring_status` 取值 `'active'` 或 `'ended'`——一旦變為 `'ended'`，收款位址就不再被監控——而 `transfers` 是已確認的鏈上收款紀錄（每一項都含 `tx_hash`、`amount` 和 `explorer_tx_url`）。測試帳單裡兩者分別為 `null` / `[]`。
+帳單有兩個狀態欄位。`status` 是記帳狀態——`unpaid`、`partially_paid`、`paid`、`settling`、`settled`、`review_required`，其中三個等同已付款的取值只差在資金離你的錢包還有多遠。`checkout_status` 是付款人看到的狀態——`open`、`confirming`、`expired`、`paid`、`unavailable`——它從不構成履約依據。`payment_revision` 每當已確認的付款集合改變就加一，你可以據此丟掉比手上更舊的快照。
+
+回應裡的金額一律格式化為 4 位小數：用 `'129'` 建立，帳單會回傳 `amount: '129.0000'`。比較金額請按數值比，不要按字串比。`amount_due` 依 `max(amount - amount_paid, 0)` 衍生，使用和 `amount_paid` 相同的 18 位小數 scale；`amount_overpaid` 與它互為鏡像，即 `max(amount_paid - amount, 0)`，所以你不必自己做減法。
+
+`payment_options` 裝的是付款指示，建立時即固定，測試模式下為 `[]`。每一項先看 `status`，再看 `collection_method`：只有 `'ready'` 可付，`'evm_deposit'` 帶 `deposit_address` 和 `suggested_amount`，`'direct_exact'` 帶 `recipient_address` 以及買家必須一位不差轉出的 `exact_amount`。`transfers` 是已確認的收款紀錄——`transaction_id`、`event_index`、`amount`、`explorer_transaction_url`——在有付款確認前一直是 `[]`。完整欄位說明見 [REST API 文件](https://github.com/invoqmoney/api)。
 
 所有方法失敗時都會 reject，並帶有下列錯誤：
 
@@ -248,13 +253,14 @@ const invoq = new Invoq(apiKey, {
 
 請求預設 10 秒逾時（`timeoutMs`）。`create` 逾時後用同一個 `reference_id` 重試是安全的——拿回的是既有帳單，不會重複開單。
 
-`verifyWebhook(rawBody, headers, secret)` 的原始請求內容接受字串、`Uint8Array` 或 Node 的 `Buffer`；headers 接受 Fetch 的 `Headers` 物件或 Node 的一般 header 物件。驗證通過回傳解析好的事件，失敗擲出 `InvoqSignatureVerificationError`。用 `isInvoicePaid(event)` 判斷可履約的 `invoice.paid` 事件；它接受可視為已付款的帳單狀態（`paid`、`settling` 或 `settled`），並拒絕 `review_required`。
+`verifyWebhook(rawBody, headers, secret)` 的原始請求內容接受字串、`Uint8Array` 或 Node 的 `Buffer`；headers 接受 Fetch 的 `Headers` 物件或 Node 的一般 header 物件。驗證通過回傳解析好的事件，失敗擲出 `InvoqSignatureVerificationError`。用 `isInvoicePaid(event)` 判斷可履約的 `invoice.paid` 事件；它接受可視為已付款的帳單狀態（`paid`、`settling` 或 `settled`），並拒絕 `review_required`。 用 `isInvoicePaymentReversed(event)` 判斷 `invoice.payment_reversed`。兩者都會收窄事件型別；本版 SDK 尚未建模的事件型別同樣能通過驗證，並原樣回傳。
 
 ### `@invoq/checkout`
 
 ```ts
 const checkout = openCheckout(invoiceId, {
   checkoutOrigin: 'https://embed.invoq.money', // 可選，覆寫預設值
+  locale: undefined, // 可選，介面語言，預設跟隨付款人瀏覽器
   styleNonce: undefined, // 可選，注入的 <style> 所用的 CSP nonce
   signal: undefined, // 可選，觸發後關閉彈窗的 AbortSignal
 })
@@ -267,11 +273,13 @@ const result = await checkout.result
 `result` 一定會 resolve（絕不 reject），值是下面幾種之一：
 
 - `{ status: 'paid' | 'overpaid', invoiceId, mode }` —— 付款已確認。彈窗會停在內嵌頁的成功畫面，直到買家自己關掉；若你要立刻跳轉頁面，請先呼叫 `checkout.close()`。
-- `{ status: 'review_required', invoiceId, mode }` —— 已收到付款，但需要人工審核。顯示待審核狀態；不要憑瀏覽器結果處理訂單。
+- `{ status: 'review_required', invoiceId, mode }` —— 收到付款，但被攔下人工審核。顯示待處理狀態即可。
 - `{ status: 'closed', invoiceId, reason }` —— 沒付款就關閉了。`reason` 可能是 `'user'`（按了關閉鈕或 Escape）、`'programmatic'`（呼叫了 `checkout.close()`）、`'replaced'`（又呼叫了一次 `openCheckout`）、`'aborted'`（`signal` 被觸發）。
 - `{ status: 'failed', invoiceId }` —— 結帳頁 15 秒內沒有載入完成。
 
-在付款結果裡，`mode` 取值 `'test'` 或 `'live'`——這是一個提示，方便你在瀏覽器裡把模擬的測試付款和真錢區分開。它僅供參考：請務必在你的伺服器端用 `invoice.paid` webhook 確認履約。
+付款結果裡的 `mode` 取值 `'test'` 或 `'live'`，方便你在瀏覽器裡區分模擬付款和真錢——僅供參考，履約請以 webhook 為準。
+
+`locale` 接受 BCP 47 語言標籤（`'fr'`、`'pt-BR'`、`'zh-Hant'` 等）。結帳頁支援十種語言，會把標籤對應到最接近的一種，所以傳入它沒有的地區變體也不會報錯。
 
 `openCheckout` 本身只在參數不合法（`invoiceId` 必須以 `inv_` 開頭）以及瀏覽器不支援 Shadow DOM 時擲錯。同一時間只會有一個結帳彈窗；再開一個，前一個會以 `reason: 'replaced'` 關閉。
 

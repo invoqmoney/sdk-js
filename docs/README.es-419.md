@@ -63,6 +63,7 @@ Ambos paquetes están escritos en TypeScript e incluyen definiciones de tipos. `
 1. Inicia sesión en el [panel de invoq](https://app.invoq.money) y crea un proyecto.
 2. En la página **API keys**, crea una clave secreta. Las claves de prueba empiezan con `sk_test_`, las claves de producción con `sk_live_`. El modo de la clave determina si las facturas son de prueba o de producción.
 3. En la configuración de **webhooks** de tu proyecto, guarda tu URL de webhook. El secreto del webhook (`whsec_...`) de ese modo se muestra una sola vez, cuando activas el webhook por primera vez — guárdalo de inmediato. La URL del webhook debe ser HTTPS y pública.
+4. Configura tu **Receiving wallet** antes de pasar a producción. Las facturas de prueba no la necesitan; una factura real sin destino de liquidación falla con `409 no_payment_options_available`.
 
 Agrega ambos al entorno de tu servidor:
 
@@ -91,7 +92,6 @@ const invoq = new Invoq(process.env.INVOQ_SECRET_KEY!)
 export async function POST() {
   const invoice = await invoq.invoices.create({
     amount: '129',
-    currency: 'USD',
     description: 'SaaS boilerplate',
     reference_id: 'order_1234',
   })
@@ -104,7 +104,7 @@ Notas:
 
 - Los ejemplos de servidor usan manejadores de rutas basados en la Web Fetch API (Next.js App Router, Hono y similares). En Express, envía la respuesta con `res.json({ invoiceId: invoice.id })`.
 - Define el monto en el servidor. No confíes en montos que manda el cliente.
-- `amount` es una cadena decimal en USD de `'0.01'` a `'1000000.00'` con hasta 2 decimales, como `'129'` o `'129.99'`.
+- `amount` es una cadena decimal en USD de `'0.01'` a `'1000000.00'` con hasta 2 decimales, como `'129'` o `'129.99'`. La moneda siempre es USD, y el modo de prueba o real viene de la clave — ninguno de los dos es un campo de la solicitud.
 - Usa `reference_id` para vincular los webhooks `invoice.paid` con tu pedido. También hace que puedas reintentar la creación sin riesgo: si creas otra factura con el mismo `reference_id` y los mismos términos, recibes la factura existente en lugar de un duplicado; si los términos son distintos, falla con un error de API `409 reference_id_conflict`.
 
 En tu frontend, llama primero a tu ruta de servidor y pasa el `invoiceId` devuelto al checkout:
@@ -158,7 +158,9 @@ export async function POST(request: Request) {
 }
 ```
 
-Usa los webhooks `invoice.paid` para procesar los pedidos en tu servidor. Cuando `isInvoicePaid(event)` es true, la factura está lista para procesarse automáticamente; usa el `reference_id` de la factura para encontrar y procesar tu pedido. Una factura `review_required` aún no emite un webhook `invoice.paid`; si el checkout devuelve `review_required`, muestra un estado pendiente de revisión y espera un webhook `invoice.paid` posterior después de que se apruebe la revisión.
+Usa los webhooks `invoice.paid` para procesar los pedidos en tu servidor. Cuando `isInvoicePaid(event)` es true, la factura está lista para procesarse automáticamente; usa su `reference_id` para encontrar tu pedido. Una factura `review_required` no emite ningún `invoice.paid` hasta que se apruebe la revisión.
+
+invoq también envía `invoice.payment_reversed` cuando una factura ya pagada vuelve a quedar por debajo de su monto — por ejemplo, si una reorganización de la cadena descarta una transferencia confirmada. Detéctalo con `isInvoicePaymentReversed(event)` y retén o revierte el procesamiento según tu propia política.
 
 Los resultados `paid`, `overpaid` y `review_required` del navegador son solo señales para la interfaz. No proceses pedidos a partir de resultados del navegador. En producción, agrega tu propio estado de carga y manejo de errores alrededor de este flujo.
 
@@ -180,7 +182,7 @@ console.log(paid.status) // 'paid'
 
 `createTestPayment` solo funciona con facturas creadas con una clave `sk_test_`. Cuando los pagos alcanzan el monto de la factura, la factura pasa a `paid` e invoq envía un webhook `invoice.paid` firmado de verdad a tu URL de webhook de prueba, así que pruebas todo tu flujo de procesamiento de pedidos. Se permiten montos parciales, que producen `partially_paid`.
 
-Para recibir webhooks en tu máquina, expón tu servidor local con un túnel HTTPS como ngrok o cloudflared y guarda la URL del túnel como tu URL de webhook de prueba en el panel. El panel también puede enviar un `webhook.ping` firmado para revisar la conectividad.
+Para recibir webhooks en tu máquina, expón tu servidor local con un túnel HTTPS como ngrok o cloudflared y guarda la URL del túnel como tu URL de webhook de prueba en el panel.
 
 ## Webhooks en producción
 
@@ -215,9 +217,9 @@ app.post(
 )
 ```
 
-**Procesa de forma idempotente.** Las entregas fallidas se reintentan (hasta 5 intentos a lo largo de unas horas, con espera creciente entre reintentos), así que tu ruta puede recibir el mismo evento más de una vez. Registra los pedidos ya procesados por `reference_id` o por `id` de factura y trata las entregas repetidas como operaciones sin efecto.
+**Procesa de forma idempotente.** Las entregas fallidas se reintentan (hasta 5 intentos, con esperas de 1 minuto, 5 minutos, 30 minutos y luego 2 horas), así que tu ruta puede recibir el mismo evento más de una vez. Registra los pedidos ya procesados por `reference_id` o por `id` de factura y trata las entregas repetidas como operaciones sin efecto. Además pueden llegar desordenadas: quédate con la instantánea que tenga el `payment_revision` más alto.
 
-**Responde con un 2xx rápido.** Cualquier otro estado cuenta como entrega fallida: los tiempos de espera, `429` y `5xx` se reintentan, mientras que otros `4xx` no.
+**Responde con un 2xx rápido.** Cualquier otro estado cuenta como entrega fallida y se reintenta, incluidos los redireccionamientos y los `4xx`, así que una ventana de despliegue o una ruta mal dirigida por un rato se reintenta en lugar de descartarse.
 
 `verifyWebhook` lanza `InvoqSignatureVerificationError` cuando la firma falta, es inválida o el timestamp está corrido más de 5 minutos — responde con un 400. El encabezado de firma es `invoq-signature: t=<segundos unix>,v1=<HMAC-SHA256 en hex de "<t>.<cuerpo sin procesar>">`, así que puedes verificarlo en cualquier lenguaje.
 
@@ -232,14 +234,17 @@ const invoq = new Invoq(apiKey, {
 })
 ```
 
-- `invoq.invoices.create(input)` — crea una factura. `input`: `amount` (requerido), `currency` (`'USD'`, predeterminado), `description`, `reference_id`, `return_url`.
+- `invoq.invoices.create(input)` — crea una factura. `input`: `amount` (requerido), `description`, `reference_id`, `return_url`.
 - `invoq.invoices.get(invoiceId)` — trae una factura pública.
 - `invoq.invoices.createTestPayment(invoiceId, { amount, reference_id? })` — simula un pago en una factura de prueba.
 
-`invoices.get()` devuelve la forma de factura pública usada por la página de checkout hospedada. Incluye campos orientados al checkout como `amount_paid`, `amount_due`, `amount_overpaid`, `payment_status`, `project`, `deposit_address`, `monitoring_ends_at`, `monitoring_status`, `transfers` y `direct_onchain_rails`, pero no incluye `reference_id`. Usa la respuesta de creación o el webhook `invoice.paid` cuando necesites tu `reference_id` de comercio.
+`invoices.get()` devuelve la forma de factura pública usada por la página de checkout hospedada: la forma de la respuesta de creación más `amount_paid`, `project` y `transfers`, y sin `reference_id`. Usa la respuesta de creación o el webhook `invoice.paid` cuando necesites tu `reference_id` de comercio.
 
-Los montos en las respuestas se normalizan a 4 decimales: crea con `'129'` y la factura devuelve `amount: '129.0000'`. Compara montos numéricamente, no como cadenas.
-`amount_due` se deriva como `max(amount - amount_paid, 0)` y usa la misma escala de 18 decimales que `amount_paid`; `amount_overpaid` es su reflejo, `max(amount_paid - amount, 0)`, así que nunca restas dinero por tu cuenta. `monitoring_status` es `'active'` o `'ended'` — una vez que es `'ended'`, la dirección de depósito deja de vigilarse — y `transfers` es el registro confirmado de recepciones on-chain (cada entrada tiene `tx_hash`, `amount` y `explorer_tx_url`). Ambos son `null` / `[]` en las facturas de prueba.
+Dos campos de estado. `status` es el contable — `unpaid`, `partially_paid`, `paid`, `settling`, `settled`, `review_required` — y los tres valores equivalentes a pagada solo se diferencian en qué tan lejos llegaron los fondos hacia tu billetera. `checkout_status` es el que ve quien paga — `open`, `confirming`, `expired`, `paid`, `unavailable` — y nunca autoriza procesar el pedido. `payment_revision` sube cada vez que cambia el conjunto de pagos confirmados, así descartas una instantánea más vieja que la que ya tienes.
+
+Los montos en las respuestas se normalizan a 4 decimales: crea con `'129'` y la factura devuelve `amount: '129.0000'`. Compara montos numéricamente, no como cadenas. `amount_due` se deriva como `max(amount - amount_paid, 0)` y usa la misma escala de 18 decimales que `amount_paid`; `amount_overpaid` es su reflejo, `max(amount_paid - amount, 0)`, así que nunca restas dinero por tu cuenta.
+
+`payment_options` contiene las instrucciones de pago, fijadas al crear la factura y `[]` en modo de prueba. Las entradas se discriminan por `status` y luego por `collection_method`: solo `'ready'` es pagable, `'evm_deposit'` trae `deposit_address` y `suggested_amount`, `'direct_exact'` trae `recipient_address` y un `exact_amount` que el comprador debe enviar hasta el último dígito. `transfers` es el registro confirmado de recepciones — `transaction_id`, `event_index`, `amount`, `explorer_transaction_url` — y queda en `[]` hasta que se confirme un pago. Referencia completa: [documentación de la API REST](https://github.com/invoqmoney/api).
 
 Cuando fallan, los métodos devuelven una promesa rechazada con:
 
@@ -248,13 +253,14 @@ Cuando fallan, los métodos devuelven una promesa rechazada con:
 
 Las solicitudes expiran a los 10 segundos por defecto (`timeoutMs`). Un `create` que expiró es seguro de reintentar con el mismo `reference_id` — recuperas la factura existente, nunca un duplicado.
 
-`verifyWebhook(rawBody, headers, secret)` acepta el cuerpo sin procesar como cadena, `Uint8Array` o `Buffer` de Node, y los encabezados como un objeto `Headers` de Fetch o un objeto plano de encabezados de Node. Devuelve el evento procesado o lanza `InvoqSignatureVerificationError`. Usa `isInvoicePaid(event)` para eventos `invoice.paid` que permiten procesar pedidos; acepta estados de factura equivalentes a pagada (`paid`, `settling` o `settled`) y rechaza `review_required`.
+`verifyWebhook(rawBody, headers, secret)` acepta el cuerpo sin procesar como cadena, `Uint8Array` o `Buffer` de Node, y los encabezados como un objeto `Headers` de Fetch o un objeto plano de encabezados de Node. Devuelve el evento procesado o lanza `InvoqSignatureVerificationError`. Usa `isInvoicePaid(event)` para eventos `invoice.paid` que permiten procesar pedidos; acepta estados de factura equivalentes a pagada (`paid`, `settling` o `settled`) y rechaza `review_required`. Usa `isInvoicePaymentReversed(event)` para `invoice.payment_reversed`. Ambos acotan el tipo del evento; un tipo de evento que esta versión del SDK todavía no modela igual se verifica y se devuelve tal cual.
 
 ### `@invoq/checkout`
 
 ```ts
 const checkout = openCheckout(invoiceId, {
   checkoutOrigin: 'https://embed.invoq.money', // opcional, sobrescribe el valor predeterminado
+  locale: undefined, // opcional, idioma de la interfaz; por defecto el del navegador
   styleNonce: undefined, // opcional, nonce CSP para el <style> inyectado
   signal: undefined, // opcional, AbortSignal que cierra la ventana
 })
@@ -267,11 +273,13 @@ const result = await checkout.result
 La promesa de `result` siempre se resuelve y nunca se rechaza, con uno de estos valores:
 
 - `{ status: 'paid' | 'overpaid', invoiceId, mode }` — pago confirmado. La ventana queda abierta mostrando la pantalla de éxito del embed hasta que el comprador la cierre; llama primero a `checkout.close()` si vas a navegar de inmediato.
-- `{ status: 'review_required', invoiceId, mode }` — pago recibido, pero requiere revisión manual. Muestra un estado pendiente de revisión; no proceses el pedido desde el resultado del navegador.
+- `{ status: 'review_required', invoiceId, mode }` — pago recibido, pero retenido para revisión manual. Muestra un estado pendiente.
 - `{ status: 'closed', invoiceId, reason }` — se cerró sin pago. `reason` es `'user'` (botón de cerrar o Escape), `'programmatic'` (`checkout.close()`), `'replaced'` (otra llamada a `openCheckout`) o `'aborted'` (se disparó el `signal`).
 - `{ status: 'failed', invoiceId }` — el checkout no cargó en 15 segundos.
 
-En los resultados de pago, `mode` es `'test'` o `'live'` — una pista para que distingas en el navegador un pago de prueba simulado de dinero real. Es solo orientativo: confirma siempre el procesamiento del pedido en tu servidor con el webhook `invoice.paid`.
+En los resultados de pago, `mode` es `'test'` o `'live'`, así distingues en el navegador un pago simulado de dinero real — solo orientativo, procesa el pedido con el webhook.
+
+`locale` acepta una etiqueta BCP 47 (`'fr'`, `'pt-BR'`, `'zh-Hant'`, …). El checkout habla diez idiomas y asigna la etiqueta al más cercano, así que una región que no tenga nunca es un error.
 
 `openCheckout` en sí lanza error con entradas inválidas (`invoiceId` debe empezar con `inv_`) y en navegadores sin soporte de Shadow DOM. Solo hay un checkout abierto a la vez; abrir otro cierra el anterior con `reason: 'replaced'`.
 

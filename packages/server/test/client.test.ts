@@ -1,27 +1,34 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Invoq, InvoqApiError, InvoqError } from '../src'
+import type {
+  CreateInvoiceInput,
+  CreateTestPaymentInput,
+  PaymentOption,
+} from '../src'
 
+// Test mode: no payment window, no issued routes.
 const invoice = {
   id: 'inv_test_123',
   mode: 'test',
-  amount: '149',
+  amount: '149.0000',
   currency: 'USD',
   reference_id: 'order_123',
   description: 'Test order',
   return_url: 'https://merchant.test/thanks',
-  deposit_address: null,
   status: 'unpaid',
+  checkout_status: 'unavailable',
+  payment_revision: 0,
   amount_due: '149.000000000000000000',
   amount_overpaid: '0.000000000000000000',
   monitoring_ends_at: null,
-  monitoring_status: null,
-  direct_onchain_rails: [],
+  payment_options: [],
 }
 
+// The public read, carrying both collection methods and both option statuses.
 const publicInvoice = {
-  id: 'inv_test_123',
-  mode: 'test',
-  amount: '149',
+  id: 'inv_live_123',
+  mode: 'live',
+  amount: '149.0000',
   currency: 'USD',
   description: 'Test order',
   return_url: null,
@@ -30,16 +37,55 @@ const publicInvoice = {
     name: 'Test project',
     logo_url: null,
   },
-  deposit_address: null,
   status: 'unpaid',
+  checkout_status: 'open',
+  payment_revision: 0,
+  amount_paid: '0.000000000000000000',
   amount_due: '149.000000000000000000',
   amount_overpaid: '0.000000000000000000',
-  monitoring_ends_at: null,
-  monitoring_status: null,
-  direct_onchain_rails: [],
-  amount_paid: '0',
-  payment_status: 'unpaid',
   transfers: [],
+  monitoring_ends_at: '2026-06-16T00:00:00.000Z',
+  payment_options: [
+    {
+      collection_method: 'evm_deposit',
+      chain_namespace: 'eip155',
+      chain_reference: '8453',
+      currency: 'USD',
+      token_address: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+      token_decimals: 6,
+      network_label: 'Base',
+      display_symbol: 'USDC',
+      logo_url: null,
+      chain_logo_url: null,
+      status: 'ready',
+      deposit_address: '0x20c124f3919bb502c6126cda5bd6e5287859d5ca',
+      suggested_amount: '149.000000',
+    },
+    {
+      collection_method: 'direct_exact',
+      chain_namespace: 'tron',
+      chain_reference: '0x2b6653dc',
+      currency: 'USD',
+      token_address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+      token_decimals: 6,
+      network_label: 'TRON',
+      display_symbol: 'USDT',
+      logo_url: null,
+      chain_logo_url: null,
+      status: 'unavailable',
+    },
+  ],
+}
+
+// The create shape plus amount_paid and fully_paid_at, one revision on.
+const paidTestInvoice = {
+  ...invoice,
+  status: 'paid',
+  checkout_status: 'paid',
+  payment_revision: 1,
+  amount_paid: '149.000000000000000000',
+  amount_due: '0.000000000000000000',
+  fully_paid_at: '2026-06-15T00:00:00.000Z',
 }
 
 describe('@invoq/server client', () => {
@@ -88,7 +134,6 @@ describe('@invoq/server client', () => {
     })
     const result = await invoq.invoices.create({
       amount: '149',
-      currency: 'USD',
       description: 'Test order',
       reference_id: 'order_123',
       return_url: 'https://merchant.test/thanks',
@@ -107,9 +152,9 @@ describe('@invoq/server client', () => {
     expect(headers.get('Content-Type')).toBe('application/json')
     expect(headers.get('User-Agent')).toMatch(/^invoq-node\/\d+\.\d+\.\d+/)
     expect(init.signal).toBeInstanceOf(AbortSignal)
+    // No currency, no mode: the API rejects unknown body keys.
     expect(JSON.parse(init.body as string)).toEqual({
       amount: '149',
-      currency: 'USD',
       description: 'Test order',
       reference_id: 'order_123',
       return_url: 'https://merchant.test/thanks',
@@ -123,18 +168,18 @@ describe('@invoq/server client', () => {
       'fetch',
       vi.fn().mockRejectedValue(new DOMException('timed out', 'TimeoutError')),
     )
-    await expect(
-      invoq.invoices.create({ amount: '1', currency: 'USD' }),
-    ).rejects.toThrow('invoq API request timed out.')
+    await expect(invoq.invoices.create({ amount: '1' })).rejects.toThrow(
+      'invoq API request timed out.',
+    )
 
     // Node 20.0-20.7 reports mid-request timeout aborts as AbortError.
     vi.stubGlobal(
       'fetch',
       vi.fn().mockRejectedValue(new DOMException('aborted', 'AbortError')),
     )
-    await expect(
-      invoq.invoices.create({ amount: '1', currency: 'USD' }),
-    ).rejects.toThrow('invoq API request timed out.')
+    await expect(invoq.invoices.create({ amount: '1' })).rejects.toThrow(
+      'invoq API request timed out.',
+    )
 
     // Timeout firing while the response body streams rejects response.text().
     vi.stubGlobal(
@@ -146,9 +191,9 @@ describe('@invoq/server client', () => {
           Promise.reject(new DOMException('timed out', 'TimeoutError')),
       } as unknown as Response),
     )
-    await expect(
-      invoq.invoices.create({ amount: '1', currency: 'USD' }),
-    ).rejects.toThrow('invoq API request timed out.')
+    await expect(invoq.invoices.create({ amount: '1' })).rejects.toThrow(
+      'invoq API request timed out.',
+    )
   })
 
   it('omits unset optional invoice request strings while accepting null response fields', async () => {
@@ -170,7 +215,6 @@ describe('@invoq/server client', () => {
     })
     const result = await invoq.invoices.create({
       amount: '149',
-      currency: 'USD',
     })
 
     expect(result).toEqual(invoiceWithoutMetadata)
@@ -179,8 +223,37 @@ describe('@invoq/server client', () => {
 
     expect(JSON.parse(init.body as string)).toEqual({
       amount: '149',
-      currency: 'USD',
     })
+  })
+
+  // Untyped callers still pass `currency` from older examples. It has to be
+  // dropped here, not sent to an API that rejects unknown body keys.
+  it('drops properties that are not request fields', async () => {
+    // A fresh Response per call: a body can only be read once.
+    const fetchMock = vi.fn().mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ data: invoice }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const invoq = new Invoq('sk_test_123', { apiOrigin: 'https://api.test' })
+
+    await invoq.invoices.create({
+      amount: '149',
+      currency: 'USD',
+      mode: 'live',
+    } as unknown as CreateInvoiceInput)
+    await invoq.invoices.createTestPayment('inv_test_123', {
+      amount: '149',
+      currency: 'USD',
+    } as unknown as CreateTestPaymentInput)
+
+    for (const call of fetchMock.mock.calls as [URL, RequestInit][]) {
+      expect(JSON.parse(call[1].body as string)).toEqual({ amount: '149' })
+    }
   })
 
   it('rejects invalid request strings before fetch, as rejections', async () => {
@@ -263,18 +336,59 @@ describe('@invoq/server client', () => {
     expect(headers.get('Content-Type')).toBeNull()
   })
 
-  it('creates test payments and returns only the data envelope', async () => {
-    const paidInvoice = {
-      ...invoice,
-      status: 'paid',
-      amount_paid: '149',
+  // Payable fields sit behind `status` then `collection_method`; typecheck
+  // covers the compile side, this pins the runtime half.
+  it('narrows payment options through status and collection method', async () => {
+    const paidPublicInvoice = {
+      ...publicInvoice,
+      status: 'settled',
+      checkout_status: 'paid',
+      payment_revision: 1,
+      amount_paid: '149.000000000000000000',
       amount_due: '0.000000000000000000',
-      fully_paid_at: '2026-06-15T00:00:00.000Z',
+      transfers: [
+        {
+          chain_namespace: 'eip155',
+          chain_reference: '8453',
+          transaction_id: `0x${'ab'.repeat(32)}`,
+          event_index: 2,
+          amount: '149.000000000000000000',
+          explorer_transaction_url: `https://basescan.org/tx/0x${'ab'.repeat(32)}`,
+        },
+      ],
     }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: paidPublicInvoice }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+
+    const invoq = new Invoq('sk_test_123', { apiOrigin: 'https://api.test' })
+    const result = await invoq.invoices.get('inv_live_123')
+    const payable = result.payment_options.flatMap((option) => {
+      if (option.status !== 'ready') {
+        return []
+      }
+
+      return option.collection_method === 'evm_deposit'
+        ? [option.deposit_address]
+        : [option.exact_amount]
+    })
+
+    expect(payable).toEqual(['0x20c124f3919bb502c6126cda5bd6e5287859d5ca'])
+    expect(result.transfers[0]?.transaction_id).toMatch(/^0x[0-9a-f]{64}$/)
+    expect(result.transfers[0]?.amount).toBe(result.amount_paid)
+  })
+
+  it('creates test payments and returns only the data envelope', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          data: paidInvoice,
+          data: paidTestInvoice,
           meta: { result: 'created' },
         }),
         {
@@ -295,7 +409,7 @@ describe('@invoq/server client', () => {
 
     const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit]
 
-    expect(result).toEqual(paidInvoice)
+    expect(result).toEqual(paidTestInvoice)
     expect(url.toString()).toBe(
       'https://api.test/v1/invoices/inv_test_123/test-payments',
     )
@@ -306,15 +420,8 @@ describe('@invoq/server client', () => {
   })
 
   it('omits unset optional test payment request strings', async () => {
-    const paidInvoice = {
-      ...invoice,
-      status: 'paid',
-      amount_paid: '149',
-      amount_due: '0.000000000000000000',
-      fully_paid_at: '2026-06-15T00:00:00.000Z',
-    }
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ data: paidInvoice }), {
+      new Response(JSON.stringify({ data: paidTestInvoice }), {
         status: 201,
         headers: { 'Content-Type': 'application/json' },
       }),
@@ -379,7 +486,7 @@ describe('@invoq/server client', () => {
     const invoq = new Invoq('sk_test_123')
 
     await expect(
-      invoq.invoices.create({ amount: '0.001', currency: 'USD' }),
+      invoq.invoices.create({ amount: '0.001' }),
     ).rejects.toMatchObject({
       name: 'InvoqApiError',
       status: 400,
@@ -409,9 +516,7 @@ describe('@invoq/server client', () => {
 
     const invoq = new Invoq('sk_test_123')
 
-    await expect(
-      invoq.invoices.create({ amount: '1', currency: 'USD' }),
-    ).rejects.toMatchObject({
+    await expect(invoq.invoices.create({ amount: '1' })).rejects.toMatchObject({
       name: 'InvoqApiError',
       status: 502,
       payload: '<html>bad gateway</html>',
@@ -423,17 +528,45 @@ describe('@invoq/server client', () => {
 
     const invoq = new Invoq('sk_test_123')
 
-    await expect(
-      invoq.invoices.create({ amount: '1', currency: 'USD' }),
-    ).rejects.toBeInstanceOf(InvoqError)
+    await expect(invoq.invoices.create({ amount: '1' })).rejects.toBeInstanceOf(
+      InvoqError,
+    )
 
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response('not json', { status: 200 })),
     )
 
-    await expect(
-      invoq.invoices.create({ amount: '1', currency: 'USD' }),
-    ).rejects.toBeInstanceOf(InvoqError)
+    await expect(invoq.invoices.create({ amount: '1' })).rejects.toBeInstanceOf(
+      InvoqError,
+    )
   })
 })
+
+// Compile-time contract, enforced by `pnpm typecheck`: payable fields stay
+// unreachable until the union has narrowed. Each @ts-expect-error fails the
+// build if the error stops happening — that is, if PaymentOption is flattened.
+function paymentOptionNarrowing(option: PaymentOption) {
+  // @ts-expect-error payable fields need `status` narrowed first
+  void option.deposit_address
+
+  if (option.status !== 'ready') {
+    return
+  }
+
+  // @ts-expect-error a ready option still needs `collection_method` narrowed
+  void option.exact_amount
+
+  if (option.collection_method === 'evm_deposit') {
+    void option.deposit_address
+    void option.suggested_amount
+    return
+  }
+
+  void option.recipient_address
+  void option.exact_amount
+  void option.invoice_amount
+  void option.matching_increment
+}
+
+void paymentOptionNarrowing
