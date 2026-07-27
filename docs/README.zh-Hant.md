@@ -25,7 +25,7 @@
 - **USDC 和 USDT，九條網路。** Base、TRON、Solana、BNB Chain、Arbitrum、Polygon、HyperEVM、Morph、Ethereum。
 - **收款零 gas。** 轉帳的網路費買家自己出，結算的鏈上費用由 invoq 承擔。
 - **買家什麼都不用註冊。** 任何錢包都能付，從交易所直接提幣也行。結帳頁支援十種語言。
-- **定價簡單。** 前 10 筆收款免手續費，之後 0.5%，無其他費用——目前定價請見 [invoq.money](https://invoq.money)。
+- **定價簡單。** 公測期間註冊，帳號永久免費。目前定價請見 [invoq.money](https://invoq.money)。
 
 ## 伺服器端 SDK
 

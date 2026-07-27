@@ -25,7 +25,7 @@ Mau lihat dulu? Beranda [invoq.money](https://invoq.money) menjalankan demo inte
 - **USDC & USDT di sembilan jaringan.** Base, TRON, Solana, BNB Chain, Arbitrum, Polygon, HyperEVM, Morph, Ethereum.
 - **Tanpa gas untuk menerima uang.** Pembeli membayar biaya transfernya sendiri; biaya settlement on-chain ditanggung invoq.
 - **Pembeli tidak perlu mendaftar apa pun.** Dompet apa pun bisa bayar — langsung dari bursa juga bisa. Checkout ini tersedia dalam sepuluh bahasa.
-- **Harga sederhana.** 10 pembayaran pertama gratis, lalu 0,5%, tanpa biaya lain — lihat harga terbaru di [invoq.money](https://invoq.money).
+- **Harga sederhana.** Daftar selama masa beta dan akun Anda gratis selamanya — lihat harga terbaru di [invoq.money](https://invoq.money).
 
 ## SDK server
 

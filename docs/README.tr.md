@@ -25,7 +25,7 @@ Web sitenizde stablecoin ödemeleri kabul edin. Ödeme, müşterinin siteden hi�
 - **Dokuz ağda USDC ve USDT.** Base, TRON, Solana, BNB Chain, Arbitrum, Polygon, HyperEVM, Morph, Ethereum.
 - **Ödeme almak için gas yok.** Alıcı kendi gönderim ücretini öder; zincir üstü aktarımı invoq karşılar.
 - **Alıcı için üyelik yok.** Herhangi bir cüzdan ödeyebilir — doğrudan borsadan da olur. Ödeme sayfası on dili destekler.
-- **Basit fiyatlandırma.** İlk 10 ödeme ücretsiz, sonrası %0,5, başka hiçbir ücret yok — güncel fiyatlar için [invoq.money](https://invoq.money).
+- **Basit fiyatlandırma.** Beta döneminde kaydolun, hesabınız sonsuza dek ücretsiz kalsın — güncel fiyatlar için [invoq.money](https://invoq.money).
 
 ## Sunucu SDK'ları
 

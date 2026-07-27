@@ -25,7 +25,7 @@ Muốn xem trước? Trang chủ [invoq.money](https://invoq.money) chạy sẵn
 - **USDC & USDT trên chín mạng.** Base, TRON, Solana, BNB Chain, Arbitrum, Polygon, HyperEVM, Morph, Ethereum.
 - **Nhận tiền không tốn gas.** Phí chuyển do người mua tự trả; phí trên chuỗi để tiền về ví thì invoq lo.
 - **Người mua không phải đăng ký gì.** Ví nào cũng trả được — trả thẳng từ sàn cũng xong. Trang thanh toán hỗ trợ mười ngôn ngữ.
-- **Giá đơn giản.** Miễn phí 10 khoản thanh toán đầu tiên, sau đó 0,5%, không còn phí nào khác — xem giá hiện hành tại [invoq.money](https://invoq.money).
+- **Giá đơn giản.** Đăng ký trong thời gian beta và tài khoản của bạn miễn phí vĩnh viễn — xem giá hiện hành tại [invoq.money](https://invoq.money).
 
 ## SDK server
 

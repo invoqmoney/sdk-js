@@ -23,7 +23,7 @@ Want to see it first? The [invoq.money](https://invoq.money) homepage runs an in
 - **USDC & USDT on nine networks.** Base, TRON, Solana, BNB Chain, Arbitrum, Polygon, HyperEVM, Morph, Ethereum.
 - **No gas to get paid.** Buyers pay their own transfer fee; invoq covers the on-chain settlement.
 - **Nothing for buyers to sign up for.** Any wallet can pay — straight from an exchange works too. The checkout supports ten languages.
-- **Simple pricing.** First 10 payments free, then 0.5%, no other fees — see [invoq.money](https://invoq.money) for current pricing.
+- **Simple pricing.** Sign up during the beta and your account stays free forever — see [invoq.money](https://invoq.money) for current pricing.
 
 ## Server SDKs
 

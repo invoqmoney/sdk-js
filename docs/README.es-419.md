@@ -25,7 +25,7 @@ Acepta pagos en stablecoins en tu sitio web con una ventana de pago integrada en
 - **USDC y USDT en nueve redes.** Base, TRON, Solana, BNB Chain, Arbitrum, Polygon, HyperEVM, Morph, Ethereum.
 - **Sin gas para cobrar.** El comprador paga su propia comisión de envío; invoq cubre la liquidación on-chain.
 - **Tus compradores no se registran en nada.** Cualquier billetera puede pagar — directo desde un exchange también funciona. El checkout está disponible en diez idiomas.
-- **Precios simples.** Los primeros 10 pagos sin comisión, luego 0.5%, sin ningún otro cargo — mira los precios vigentes en [invoq.money](https://invoq.money).
+- **Precios simples.** Regístrate durante la beta y tu cuenta queda gratis para siempre — mira los precios vigentes en [invoq.money](https://invoq.money).
 
 ## SDKs de servidor
 

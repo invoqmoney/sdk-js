@@ -25,7 +25,7 @@ Quer ver primeiro? A página inicial de [invoq.money](https://invoq.money) roda 
 - **USDC e USDT em nove redes.** Base, TRON, Solana, BNB Chain, Arbitrum, Polygon, HyperEVM, Morph, Ethereum.
 - **Zero gas para receber.** O comprador paga a própria taxa de envio; a invoq banca a liquidação on-chain.
 - **O comprador não se cadastra em nada.** Qualquer carteira paga — direto de uma exchange também funciona. O checkout está disponível em dez idiomas.
-- **Preço simples.** Os 10 primeiros pagamentos sem taxa, depois 0,5%, nenhuma outra taxa — veja os preços vigentes em [invoq.money](https://invoq.money).
+- **Preço simples.** Cadastre-se durante o beta e sua conta fica grátis para sempre — veja os preços vigentes em [invoq.money](https://invoq.money).
 
 ## SDKs de servidor
 
