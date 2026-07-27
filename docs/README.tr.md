@@ -19,6 +19,12 @@ Web sitenizde stablecoin ödemeleri kabul edin. Ödeme, müşterinin siteden hi�
 
 Önce görmek ister misiniz? [invoq.money](https://invoq.money) ana sayfası bu ödeme sayfasının etkileşimli bir demosunu çalıştırıyor — birkaç saniyede simüle bir ödemeyi tamamlayabilirsiniz.
 
+**AI ile mi kod yazıyorsunuz? Bunu yapıştırın.**
+
+```
+invoq ile projeme stablecoin ödemesi ekle. Test modunda başla. Kod yazmadan önce belgeleri oku: https://invoq.money/llms.txt
+```
+
 ## Neden invoq
 
 - **Cüzdan sizin, bizim değil.** Her ödeme yalnızca sizin kontrol ettiğiniz cüzdana iner — invoq gideceği yeri değiştiremez.

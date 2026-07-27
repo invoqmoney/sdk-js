@@ -19,6 +19,12 @@ Acceptez des paiements en stablecoins sur votre site grâce à une fenêtre de p
 
 Envie de le voir d’abord ? La page d’accueil d’[invoq.money](https://invoq.money) propose une démo interactive de cette page de paiement : vous pouvez y effectuer un paiement simulé en quelques secondes.
 
+**Vous codez avec une IA ? Collez ceci.**
+
+```
+Ajoute les paiements en stablecoins à mon projet avec invoq. Commence en mode test. Lis la documentation avant de coder : https://invoq.money/llms.txt
+```
+
 ## Pourquoi invoq
 
 - **Votre portefeuille, pas le nôtre.** Chaque paiement atterrit dans un portefeuille que vous seul contrôlez — invoq ne peut pas en changer la destination.

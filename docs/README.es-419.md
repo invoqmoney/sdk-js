@@ -19,6 +19,12 @@ Acepta pagos en stablecoins en tu sitio web con una ventana de pago integrada en
 
 ¿Quieres verlo primero? La página de inicio de [invoq.money](https://invoq.money) tiene una demo interactiva de este checkout: puedes completar un pago simulado en segundos.
 
+**¿Programas con IA? Pega esto.**
+
+```
+Agrega pagos con stablecoins a mi proyecto con invoq. Empieza en modo de prueba. Lee la documentación antes de escribir código: https://invoq.money/llms.txt
+```
+
 ## Por qué invoq
 
 - **Tu billetera, no la nuestra.** Cada pago aterriza en una billetera que solo tú controlas — invoq no puede cambiar su destino.

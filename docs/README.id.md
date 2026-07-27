@@ -19,6 +19,12 @@ Terima pembayaran stablecoin di situs Anda lewat jendela checkout yang tertanam 
 
 Mau lihat dulu? Beranda [invoq.money](https://invoq.money) menjalankan demo interaktif checkout ini — Anda bisa menyelesaikan pembayaran simulasi dalam hitungan detik.
 
+**Coding pakai AI? Tempelkan ini.**
+
+```
+Tambahkan pembayaran stablecoin ke proyek saya dengan invoq. Mulai dari mode tes. Baca dokumentasinya sebelum menulis kode: https://invoq.money/llms.txt
+```
+
 ## Kenapa invoq
 
 - **Dompet Anda, bukan dompet kami.** Setiap pembayaran masuk ke dompet yang hanya Anda kendalikan — invoq tidak bisa mengubah tujuannya.

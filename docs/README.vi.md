@@ -19,6 +19,12 @@ Nhận thanh toán stablecoin ngay trên website của bạn bằng cửa sổ t
 
 Muốn xem trước? Trang chủ [invoq.money](https://invoq.money) chạy sẵn một bản demo tương tác của trang thanh toán này — bạn có thể hoàn tất một khoản thanh toán mô phỏng trong vài giây.
 
+**Đang code bằng AI? Dán câu này.**
+
+```
+Thêm thanh toán stablecoin vào dự án của tôi bằng invoq. Bắt đầu ở chế độ thử nghiệm. Đọc tài liệu trước khi viết code: https://invoq.money/llms.txt
+```
+
 ## Vì sao chọn invoq
 
 - **Ví của bạn, không phải của chúng tôi.** Mỗi khoản thanh toán đều về ví do bạn kiểm soát — invoq không thể đổi hướng nó.
