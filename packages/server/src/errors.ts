@@ -5,9 +5,14 @@ export class InvoqError extends Error {
   }
 }
 
+// The locations the API documents, as literals so they autocomplete. The open
+// `string` arm is deliberate: an unrecognized one must not cost the caller the
+// whole field error — see parseFields in internal/request.ts.
+type ApiErrorLocation = 'query' | 'path' | 'body' | (string & {})
+
 type ApiErrorField = {
   field: string
-  location: 'query' | 'path' | 'body' | 'header'
+  location: ApiErrorLocation
   code: string
   message: string
 }

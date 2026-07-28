@@ -53,7 +53,8 @@ export type PaymentOption = PaymentOptionCommon &
         // Address owned by this invoice alone; any on-time transfer credits it.
         deposit_address: string
         // Guidance, not a match requirement: max(0, amount_due - pending)
-        // rounded up, so it can exceed amount_due by one token unit.
+        // rounded up to at most 6 digits (a person retypes it) and padded back
+        // to token_decimals, so it can exceed amount_due by up to 0.000001.
         suggested_amount: string
       }
     | {

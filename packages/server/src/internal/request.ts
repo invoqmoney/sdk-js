@@ -96,6 +96,15 @@ export async function requestJson<T>(
     )
   }
 
+  // A non-object `data` is a broken envelope. Returning it defers the failure to
+  // the caller's first property read, far from here.
+  if (!isRecord(envelope.data)) {
+    throw new InvoqError(
+      'invoq API response data envelope was not an object.',
+      { cause: payload },
+    )
+  }
+
   return envelope.data as T
 }
 
@@ -137,18 +146,12 @@ function parseFields(value: unknown): InvoqApiError['fields'] {
       return []
     }
 
-    const location = field.location
-
+    // A location this version does not know is passed through, not dropped:
+    // the caller is already on an error path and needs the code and message.
+    // Only a structurally invalid entry — one with no field error to hand
+    // back — is discarded.
     if (
-      location !== 'query' &&
-      location !== 'path' &&
-      location !== 'body' &&
-      location !== 'header'
-    ) {
-      return []
-    }
-
-    if (
+      typeof field.location !== 'string' ||
       typeof field.field !== 'string' ||
       typeof field.code !== 'string' ||
       typeof field.message !== 'string'
@@ -158,7 +161,7 @@ function parseFields(value: unknown): InvoqApiError['fields'] {
 
     const apiField: NonNullable<InvoqApiError['fields']>[number] = {
       field: field.field,
-      location,
+      location: field.location,
       code: field.code,
       message: field.message,
     }

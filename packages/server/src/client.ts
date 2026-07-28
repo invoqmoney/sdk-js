@@ -33,6 +33,12 @@ export class Invoq {
       throw new InvoqError('invoq API key must be a non-empty string.')
     }
 
+    // A control character in a key is either rejected deep in the transport or
+    // silently sent; reject it here so every SDK answers the same way.
+    if (Array.from(apiKey).some(isControlCharacter)) {
+      throw new InvoqError('invoq API key must not contain control characters.')
+    }
+
     const apiOrigin = normalizeApiOrigin(
       options.apiOrigin ?? DEFAULT_API_ORIGIN,
     )
@@ -52,7 +58,7 @@ export class Invoq {
       },
 
       async get(invoiceId) {
-        const id = requiredRequestString(invoiceId, 'invoiceId')
+        const id = requiredPathSegment(invoiceId, 'invoiceId')
 
         return requestJson<PublicInvoice>(clientOptions, {
           method: 'GET',
@@ -61,7 +67,7 @@ export class Invoq {
       },
 
       async createTestPayment(invoiceId, input) {
-        const id = requiredRequestString(invoiceId, 'invoiceId')
+        const id = requiredPathSegment(invoiceId, 'invoiceId')
 
         return requestJson<TestPaymentInvoice>(clientOptions, {
           path: `/v1/invoices/${encodeURIComponent(id)}/test-payments`,
@@ -118,6 +124,11 @@ function createTestPaymentRequestBody(
   return body
 }
 
+function isControlCharacter(character: string): boolean {
+  const code = character.codePointAt(0) ?? 0
+  return code < 0x20 || code === 0x7f
+}
+
 function optionalRequestString(
   value: unknown,
   fieldName: string,
@@ -146,6 +157,20 @@ function optionalNullableRequestString(
   }
 
   return value
+}
+
+// A URL resolver pops '.' and '..', so an id of either would call a different
+// endpoint instead of 404ing. Percent-encoding is no help: normalization is first.
+function requiredPathSegment(value: unknown, fieldName: string): string {
+  const segment = requiredRequestString(value, fieldName)
+
+  if (segment === '.' || segment === '..') {
+    throw new InvoqError(
+      `${fieldName} must not be a path segment that resolves ('.' or '..').`,
+    )
+  }
+
+  return segment
 }
 
 function requiredRequestString(value: unknown, fieldName: string): string {

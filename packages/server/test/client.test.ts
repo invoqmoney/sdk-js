@@ -472,6 +472,13 @@ describe('@invoq/server client', () => {
               code: 'required',
               message: 'Required.',
             },
+            {
+              location: 'unexpected',
+              field: 'currency',
+              code: 'unknown_field',
+              message: 'Unknown field.',
+            },
+            { location: 'body', field: 'description', message: 'No code.' },
           ],
           meta: { request_id: 'req_test' },
         }),
@@ -497,6 +504,12 @@ describe('@invoq/server client', () => {
           field: 'amount',
           code: 'required',
           message: 'Required.',
+        },
+        {
+          location: 'unexpected',
+          field: 'currency',
+          code: 'unknown_field',
+          message: 'Unknown field.',
         },
       ],
       meta: { request_id: 'req_test' },
@@ -570,3 +583,49 @@ function paymentOptionNarrowing(option: PaymentOption) {
 }
 
 void paymentOptionNarrowing
+
+it('rejects a non-object data envelope', async () => {
+  for (const body of [
+    '{"data":null}',
+    '{"data":5}',
+    '{"data":[]}',
+    '{"data":"x"}',
+  ]) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+
+    await expect(
+      new Invoq('sk_test_123').invoices.create({ amount: '1' }),
+    ).rejects.toThrow('data envelope was not an object')
+  }
+})
+
+it('rejects a dot-segment invoice id', async () => {
+  const invoq = new Invoq('sk_test_123')
+
+  for (const id of ['.', '..']) {
+    await expect(invoq.invoices.get(id)).rejects.toThrow('path segment')
+    await expect(
+      invoq.invoices.createTestPayment(id, { amount: '1' }),
+    ).rejects.toThrow('path segment')
+  }
+})
+
+// A control character reaches the transport differently in every runtime — some
+// trim it and send, some send it raw. Rejected here so all six answer alike.
+it('rejects an API key containing control characters', () => {
+  for (const key of [
+    'sk_test_x\r\nX-Injected: yes',
+    'sk_test_x\n',
+    'sk_test\u0000x',
+  ]) {
+    expect(() => new Invoq(key)).toThrow('control characters')
+  }
+})

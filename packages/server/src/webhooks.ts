@@ -191,8 +191,10 @@ function getSignatureHeader(headers: WebhookHeaders): string | undefined {
     return undefined
   }
 
-  if (typeof Headers !== 'undefined' && headers instanceof Headers) {
-    return headers.get('invoq-signature') ?? undefined
+  // Duck-typed so a foreign-realm Headers still works: Object.entries is empty
+  // for Headers, so falling through would read a good signature as missing.
+  if (typeof (headers as Headers).get === 'function') {
+    return (headers as Headers).get('invoq-signature') ?? undefined
   }
 
   for (const [key, value] of Object.entries(headers)) {

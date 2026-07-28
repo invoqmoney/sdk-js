@@ -439,3 +439,21 @@ function webhookNarrowing(event: InvoqWebhookEvent) {
 }
 
 void webhookNarrowing
+
+it('accepts a foreign-realm Headers-like object', () => {
+  const timestamp = Math.floor(Date.now() / 1000)
+  const body = JSON.stringify({ type: 'invoice.paid' })
+  const signature = createHmac('sha256', 'whsec_test')
+    .update(`${timestamp}.${body}`)
+    .digest('hex')
+  const foreign = {
+    get: (name: string) =>
+      name.toLowerCase() === 'invoq-signature'
+        ? `t=${timestamp},v1=${signature}`
+        : null,
+  }
+
+  expect(
+    verifyWebhook(body, foreign as unknown as Headers, 'whsec_test'),
+  ).toMatchObject({ type: 'invoice.paid' })
+})
