@@ -66,7 +66,7 @@ Os dois pacotes são escritos em TypeScript e já vêm com definições de tipos
 
 ## Pegue suas chaves
 
-1. Entre no [painel da invoq](https://app.invoq.money) e crie um projeto.
+1. Entre no painel da invoq e crie um projeto.
 2. Na página **API keys**, crie uma chave secreta. Chaves de teste começam com `sk_test_`, chaves de produção com `sk_live_`. O modo da chave define se as faturas são de teste ou de produção.
 3. Nas configurações de **webhooks** do projeto, salve a URL do seu webhook. O segredo do webhook (`whsec_...`) daquele modo aparece uma única vez, quando você ativa o webhook pela primeira vez — guarde na hora. A URL do webhook precisa ser HTTPS e pública.
 4. Configure a sua **Receiving wallet** antes de ir para produção. Faturas de teste não precisam dela; uma fatura real sem destino de liquidação falha com `409 no_payment_options_available`.
@@ -172,7 +172,7 @@ Os resultados `paid`, `overpaid` e `review_required` do navegador são só sinai
 
 ## Página de checkout hospedada
 
-Toda fatura também tem uma página de checkout hospedada em `https://pay.invoq.money/<id da fatura>` — compartilhe o link ou redirecione para lá quando a janela dentro da página não encaixar. Você também pode criar faturas e copiar os links de pagamento no [painel](https://app.invoq.money), sem escrever código.
+Toda fatura também tem uma página de checkout hospedada em `https://pay.invoq.money/<id da fatura>` — compartilhe o link ou redirecione para lá quando a janela dentro da página não encaixar. Você também pode criar faturas e copiar os links de pagamento no painel, sem escrever código.
 
 ## Teste de ponta a ponta
 

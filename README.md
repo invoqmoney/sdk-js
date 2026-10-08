@@ -64,7 +64,7 @@ Both packages are written in TypeScript and ship type definitions. `@invoq/serve
 
 ## Get your keys
 
-1. Sign in to the [invoq dashboard](https://app.invoq.money) and create a project.
+1. Sign in to the invoq dashboard and create a project.
 2. On the **API keys** page, create a secret key. Test keys start with `sk_test_`, live keys with `sk_live_`. The key mode determines whether invoices are test or live.
 3. In your project's **webhooks** settings, save your webhook URL. The webhook secret (`whsec_...`) for that mode is shown once, when you first enable the webhook — store it right away. Webhook URLs must be public HTTPS URLs.
 4. Set up your **Receiving wallet** before going live. Test invoices don't need one; a live invoice with nowhere to settle fails with `409 no_payment_options_available`.
@@ -170,7 +170,7 @@ Browser `paid`, `overpaid`, and `review_required` results are UX signals only. D
 
 ## Hosted checkout page
 
-Every invoice also has a hosted checkout page at `https://pay.invoq.money/<invoice id>` — share the link or redirect to it when the in-page modal is not a fit. You can also create invoices and copy their payment links in the [dashboard](https://app.invoq.money), no code required.
+Every invoice also has a hosted checkout page at `https://pay.invoq.money/<invoice id>` — share the link or redirect to it when the in-page modal is not a fit. You can also create invoices and copy their payment links in the dashboard, no code required.
 
 ## Test it end to end
 

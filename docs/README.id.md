@@ -66,7 +66,7 @@ Kedua paket ditulis dalam TypeScript dan menyertakan definisi tipe. `@invoq/serv
 
 ## Siapkan kunci Anda
 
-1. Masuk ke [dashboard invoq](https://app.invoq.money) dan buat sebuah proyek.
+1. Masuk ke dashboard invoq dan buat sebuah proyek.
 2. Di halaman **API keys**, buat kunci rahasia (secret key). Kunci uji coba diawali `sk_test_`, kunci produksi diawali `sk_live_`. Mode kuncinya menentukan apakah invoice yang dibuat itu uji coba atau produksi.
 3. Di pengaturan **webhooks** proyek Anda, simpan URL webhook Anda. Kunci rahasia webhook (`whsec_...`) untuk mode itu hanya ditampilkan sekali, saat webhook pertama kali diaktifkan — langsung simpan. URL webhook harus berupa URL HTTPS yang bisa diakses publik.
 4. Siapkan **Receiving wallet** Anda sebelum go live. Invoice uji coba tidak membutuhkannya; invoice live tanpa tujuan penyelesaian gagal dengan `409 no_payment_options_available`.
@@ -172,7 +172,7 @@ Hasil `paid`, `overpaid`, dan `review_required` di browser hanyalah sinyal untuk
 
 ## Halaman checkout yang dihosting
 
-Setiap invoice juga punya halaman checkout yang di-host di `https://pay.invoq.money/<id invoice>` — bagikan tautannya atau alihkan ke sana kalau jendela dalam halaman kurang pas. Anda juga bisa membuat invoice dan menyalin tautan pembayarannya di [dashboard](https://app.invoq.money), tanpa kode sama sekali.
+Setiap invoice juga punya halaman checkout yang di-host di `https://pay.invoq.money/<id invoice>` — bagikan tautannya atau alihkan ke sana kalau jendela dalam halaman kurang pas. Anda juga bisa membuat invoice dan menyalin tautan pembayarannya di dashboard, tanpa kode sama sekali.
 
 ## Uji end-to-end
 

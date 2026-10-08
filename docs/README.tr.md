@@ -66,7 +66,7 @@ npm install @invoq/checkout
 
 ## Anahtarlarınızı alın
 
-1. [invoq paneline](https://app.invoq.money) giriş yapın ve bir proje oluşturun.
+1. invoq paneline giriş yapın ve bir proje oluşturun.
 2. **API keys** sayfasında bir gizli anahtar oluşturun. Test anahtarları `sk_test_` ile, canlı anahtarlar `sk_live_` ile başlar. Anahtarın modu, faturaların test mi canlı mı olacağını belirler.
 3. Projenizin **webhooks** ayarlarında webhook URL'nizi kaydedin. O modun webhook sırrı (`whsec_...`) yalnızca bir kez, webhook'u ilk etkinleştirdiğinizde gösterilir — hemen saklayın. Webhook URL'leri herkese açık HTTPS URL'leri olmalı.
 4. Canlıya geçmeden önce **Receiving wallet** ayarınızı yapın. Test faturaları buna ihtiyaç duymaz; paranın gideceği yer olmayan canlı bir fatura `409 no_payment_options_available` ile başarısız olur.
@@ -172,7 +172,7 @@ Tarayıcıdaki `paid`, `overpaid` ve `review_required` sonuçları yalnızca ara
 
 ## Barındırılan ödeme sayfası
 
-Her faturanın `https://pay.invoq.money/<fatura id>` adresinde barındırılan bir ödeme sayfası da var — sayfa içi pencere uygun olmadığında bağlantıyı paylaşın ya da oraya yönlendirin. Faturaları [panelde](https://app.invoq.money) de oluşturup ödeme bağlantılarını kopyalayabilirsiniz, kod gerekmez.
+Her faturanın `https://pay.invoq.money/<fatura id>` adresinde barındırılan bir ödeme sayfası da var — sayfa içi pencere uygun olmadığında bağlantıyı paylaşın ya da oraya yönlendirin. Faturaları panelde de oluşturup ödeme bağlantılarını kopyalayabilirsiniz, kod gerekmez.
 
 ## Uçtan uca test edin
 

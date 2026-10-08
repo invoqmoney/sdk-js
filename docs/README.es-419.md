@@ -66,7 +66,7 @@ Ambos paquetes están escritos en TypeScript e incluyen definiciones de tipos. `
 
 ## Consigue tus claves
 
-1. Inicia sesión en el [panel de invoq](https://app.invoq.money) y crea un proyecto.
+1. Inicia sesión en el panel de invoq y crea un proyecto.
 2. En la página **API keys**, crea una clave secreta. Las claves de prueba empiezan con `sk_test_`, las claves de producción con `sk_live_`. El modo de la clave determina si las facturas son de prueba o de producción.
 3. En la configuración de **webhooks** de tu proyecto, guarda tu URL de webhook. El secreto del webhook (`whsec_...`) de ese modo se muestra una sola vez, cuando activas el webhook por primera vez — guárdalo de inmediato. La URL del webhook debe ser HTTPS y pública.
 4. Configura tu **Receiving wallet** antes de pasar a producción. Las facturas de prueba no la necesitan; una factura real sin destino de liquidación falla con `409 no_payment_options_available`.
@@ -172,7 +172,7 @@ Los resultados `paid`, `overpaid` y `review_required` del navegador son solo se�
 
 ## Página de pago alojada
 
-Cada factura también tiene una página de pago alojada en `https://pay.invoq.money/<id de factura>` — comparte el enlace o redirige ahí cuando la ventana integrada no encaje. También puedes crear facturas y copiar sus enlaces de pago en el [panel](https://app.invoq.money), sin escribir código.
+Cada factura también tiene una página de pago alojada en `https://pay.invoq.money/<id de factura>` — comparte el enlace o redirige ahí cuando la ventana integrada no encaje. También puedes crear facturas y copiar sus enlaces de pago en el panel, sin escribir código.
 
 ## Pruébalo de punta a punta
 
